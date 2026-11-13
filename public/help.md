@@ -851,9 +851,10 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 13. When a route opens, its load sequences come from the **route map** (the route's day in the Customer List). The line beside the green `SAVE TO ROUTE MAP` button at the top says what is different from the route map, like **1 LOAD SEQUENCE CHANGED · 2 CUSTOMERS TO ADD · RUN ORDER CHANGED · TRUCK LOAD MAP CHANGED**, or **SAME AS THE ROUTE MAP. LAST SAVED 11-5-26 8:46 PM.**
 14. Press `PRINT NEW SEQUENCE` beside the green `SAVE TO ROUTE MAP` at the top (or `Print sequence changes` under the **Truck load map**) to print one page for the office. It works before you save and right after you save: after a save it prints the sequences that save changed. The page has the date, route and day, then **Chain**, **Account #**, **Customer** and **New sequence** for every customer on each sequence you changed, with the ones you changed in **bold**, and lines for **Changed by** and **Entered in office**.
 15. Press `SAVE TO ROUTE MAP` to send it all to the Customer List in one press: every customer's load sequence, the run order, the truck load map as the pallets are drawn here, and any customer on the BOL the route did not have (a customer not on the Customer List at all is added to it first). A route and day the Customer List does not have yet is started. The **Route Book** and **Truck Load Map** in the Customer List show it right away, and the next time anyone opens that route here it is sequenced that way.
-16. Right under the top, **CUSTOMERS ON ROUTE 813 · THURSDAY** lists every customer on the open route with its cases on that route day from the weekly route report (the WEEKLY ROUTE REPORT box on Hub > Administration > **Accounting Numbers**; the Customer List keeps them by route day): **LOW**, **MIDDLE**, **AVERAGE**, **HIGH** and **LAST 5 WEEKS**. The number in yellow is the one the customer's pallet space is held for, shown in **HELD FOR** with its stacks. **TODAY'S BOL** is the cases on the bill of lading, and **SPACE** says what happened: **17 CS HELD, SHADED** or **OVER BY 6 · SPACE ADDED**.
-17. To hold a customer's space for another number on that route and day, pick it in its **PALLET USES** box (**STANDARD** follows Pallet Rules). It saves by itself, and the Customer List shows the same pick.
-18. Press `PALLET RULES` to open the rules for the whole plant: the **STANDARD RULE** (HIGH unless changed), **WEEKS IN THE LAST WEEKS AVERAGE**, **CRATES TO A PALLET** (54), **CRATES TO A STACK** (6), **DISPENSERS TO A PALLET** (45), **PALLET SPOTS FOR ONE TOTE**, whether **A BOX GOES IN A CRATE**, **NEW PALLET FOR EACH LOAD SEQUENCE**, and what happens **WHEN A CUSTOMER HAS FEWER CASES** (keep the space, shaded) or more (space is added). Each box saves by itself. Press `PALLET RULES` again to close them.
+16. Right under the top, **CUSTOMERS ON ROUTE 813 · THURSDAY** lists every customer on the open route with its cases on that route day from the weekly route report (the WEEKLY ROUTE REPORT box on Hub > Administration > **Accounting Numbers**; the Customer List keeps them by route day): **LOW**, **MIDDLE**, **AVERAGE**, **HIGH**, **LAST 5 WEEKS** and the **HIGHEST CASES AVERAGE**, then the **RULE SET MAX** (see step 19). The **HIGHEST CASES AVERAGE** is the customer's 5 biggest weeks in the last 8 weeks with the biggest thrown out and the other 4 averaged, rounded up; every customer's space is held for it unless its **PALLET USES** says otherwise. The number in yellow is the one the customer's pallet space is held for, shown in **HELD FOR** with its stacks. **TODAY'S BOL** is the cases on the bill of lading, and **SPACE** says what happened: **17 CS HELD, SHADED** or **OVER BY 6 · SPACE ADDED**.
+17. To hold a customer's space for another number on that route and day, pick it in its **PALLET USES** box (**STANDARD** is the highest cases average). It saves by itself, and the Customer List shows the same pick.
+18. Press `PALLET RULES` to open the rules for the whole plant: the **STANDARD RULE** (always the **HIGHEST CASES AVERAGE, 8 WEEKS**; it cannot be changed here), **WEEKS IN THE LAST WEEKS AVERAGE**, **CRATES TO A PALLET** (54), **CRATES TO A STACK** (6), **DISPENSERS TO A PALLET** (45), **PALLET SPOTS FOR ONE TOTE**, whether **A BOX GOES IN A CRATE**, **NEW PALLET FOR EACH LOAD SEQUENCE**, and what happens **WHEN A CUSTOMER HAS FEWER CASES** (keep the space, shaded) or more (space is added). Each box saves by itself. Press `PALLET RULES` again to close them.
+19. Press `RULE SET` to read the rules every pallet is built by. The **RULE SET MAX** starts from the highest cases average (62, 55, 54, 52 and 51 cases give 53). It goes up right away but never comes down until it is a year old, so a seasonal customer keeps its busy-season number; then the table shows **HELD FROM** the date it was set and what it would be **NOW**. The **Max** column in the **Truck load map** shows it for each customer while you change sequences. Press `RULE SET` again to close it.
 
 > When the Hub has no BOL days, or they could not be read, a red line under the day says so (and why), and the day line ends **THE BOL BUILT INTO PALLET BUILDER**: that is the 11-5-26 BOL that comes with the builder, not the newest one. When the Hub has none, the red line also says what the Hub's **Daily BOL** last did, like **LAST CHECKED 11-7-26 8:32 AM**, **THIS APP'S HUB HAS NEVER CHECKED THE EMAIL** or **CHECK EVERY HOUR IS NOT TICKED**. Open the Hub from this app's own Hub link (the practice copy has its own Hub and its own BOL days), go to Administration > **Daily BOL** and do what the line says. Then press Ctrl+F5 here; if the red line stays, send a picture of it.
 > **All routes** lists the routes on the open BOL day only (and any route you saved with no date in its name). When you change the BOL day, the list and the **ROUTE** box change to that day, and `Open` never switches the day. Press `HIDE ROUTES` to fold the list up and `SHOW ROUTES` to open it again; it stays the way you left it. **LOAD SEQUENCES** counts each route's load sequences on the BOL: customers that share a load sequence count once. Long words wrap, so nothing is cut off.
@@ -865,10 +866,15 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 
 > A product's **Units In A Case**, **Cases To A Pallet** and **Net Weight** on the **Product Sheet** win over the builder's own numbers and Pallet Rules for that product. A blank box leaves the builder's number.
 
+> On the truck every stack shows its load sequence number, **0** included (sequence 0 goes across the front). Each load sequence from 0 to 15 has its own color; a stop with no load sequence is grey and shows **#** and its run number.
+
+> The **RULE SET MAX** is for sequence changes only. The pallets made each day hold space at the **HIGHEST CASES AVERAGE**; when the day's BOL has more cases, space is added.
+
 !> Do not pick **LOW** for a customer that grows in summer: its pallet comes up short when it does.
 
 ### Buttons
 - `◀ DAY BEFORE`, `DAY AFTER ▶`: go back or forward one BOL day. Greyed out when there is no older or newer BOL (point at it to see why).
+- `RULE SET`: opens or closes the rules every pallet is built by, with the maximum for sequence changes.
 - `SAVE TO ROUTE MAP`: sends the load sequences, run order, truck load map and missing customers for the open route to the Customer List.
 - `NEW ROUTE`, `COPY ROUTE`, `DELETE ROUTE` (under **MORE ROUTE TOOLS**): start a route, copy the one open, or remove it (it asks you to press `Yes, delete` first).
 - **NEW PALLET FOR EACH STOP** (under **MORE ROUTE TOOLS**): tick it so no pallet mixes two stops.
@@ -1058,11 +1064,30 @@ Everything the plant keeps, in **four inventories**, each its own tab at the top
 
 Inventory opens in **its own window** (a new tab) from the menu, from the Shipping & Receiving card and from the Hub, so it can stay open beside the other screens. Its menu lists only Inventory's screens.
 
+- Inventory opens on **Lists** (see below). The menu's Plant Supplies, Raw Milk, Cooler and Maintenance open straight to that inventory.
 - A product's **kind** decides which inventory it is in: Raw Milk; Milk Product (Cooler); Ingredient, Packaging, Chemical or Other (Plant Supplies); Maintenance Part or Safety (Maintenance).
 - **On Hand** lists each product: where it is kept (its **area** and spot, under its name), its supplier, what it is counted in, the **last count** and when, what was **received since**, what was **used since**, **Should have** and its **Low at** number.
 - **Should have** is the last count, plus what was received since, minus what was taken out since.
 - Stock comes **in** when a load is marked received on Receiving, or when the Boxing tablet presses `RECEIVED` on a delivery it scanned.
 - Stock goes **out** with `Take out` here, with the **Take Out** tab on the Boxing tablet, and by itself when the Production Lines count milk products made (see Cooler).
+
+### Lists: see only the part you want
+
+Every product is on **one product list**. The **Lists** tab, where Inventory opens, shows it in parts, a card for each, with how many products are on it and how many are low (in red):
+
+- Each inventory (**All Raw Milk**, **All Cooler**, **All Plant Supplies**, **All Maintenance**), and the kinds in it: **Ingredients**, **Packaging**, **Chemicals** and **Other supplies** in Plant Supplies; **Parts** and **Safety gear** in Maintenance.
+- **My lists**: the plant's own lists, for example CAPS, LABELS or BOXES. A list is there as long as a product is on it.
+
+1. Press a card. **On Hand** opens showing only that list.
+2. On one of your own lists, the blue `List: ... · Show all` button at the top goes back to the whole inventory.
+
+To put a product on one of your own lists:
+
+1. On **On Hand**, press `Lists` on the product's line.
+2. Type the list names with a comma between them, for example CAPS, GALLON LINE. A list already made is offered as you type.
+3. Press `Save lists`. Blank takes it off every list. A product can be on up to 8 lists.
+
+> Lists only change what you see. Counts, take outs and History are the same whichever list you open it from.
 
 ### Find a product: type it or scan it
 
@@ -1215,7 +1240,7 @@ Everything on this screen is in capitals.
 Our **United Dairy** trailers come first: only the ones someone put on the list with `+ Add Trailer`. Once on the list they stay: in the lot, or **NOT HERE** (in grey, at the bottom) after they leave. The fleet list is not loaded onto the screen. **Other suppliers** is the other suppliers' trailers in the lot. The list looks like **Inventory**: a blue heading bar with the same names. Each line shows the **Supplier**, the **Unit** number, the **Status** (how full it is), the **Product** on it, **How Many** and what they are **Counted In** (one line for each product), and its **Location**, with an `Edit` button.
 
 1. One of our trailers pulls in for the first time: press `+ Add Trailer`, pick **United Dairy** and type its number (below). One that is already on the list as NOT HERE: press `Edit` on its line, pick where it is parked (**UPPER LOT**, **LOWER LOT**, **DEBAG** or **HOLD**) and press `Save`. It goes in as Empty.
-2. A trailer moves: press `Edit` on its line, pick the new place and press `Save`.
+2. A trailer moves: press `Edit` on its line (or double-click the line), pick the new place and press `Save`.
 3. A trailer leaves: press `Edit`, pick **NOT HERE** and press `Save` (or press `Left the Lot` on the trailer). Ours stays on the list as NOT HERE; another supplier's comes off the list.
 4. Adding a trailer: press `+ Add Trailer`. The **Supplier** and **Unit number** are side by side. Pick the supplier (Receiving's suppliers are on the list too), then type the unit number. A supplier that is not on the list: pick `+ New supplier` and type its name. For **United Dairy**, type the number: the T- goes on by itself (98 shows T-980, T-985 and the rest; 014 looks for T-14), and only our dry box trailers that are not in the lot come up. Tap the one you mean.
 5. On `+ Add Trailer`, pick **What is on it** and type **How many** (in what the product is counted in, for example bundles). Press `Add to the Lot`. It goes in at UPPER LOT, Loaded when something is on it.
@@ -1225,6 +1250,7 @@ Our **United Dairy** trailers come first: only the ones someone put on the list 
 
 - What is on it comes from **Suppliers & Products** (Receiving), grouped by supplier, with what each one is counted in. A product that is not there: press `+ Add Product` or the `Suppliers & Products` button at the top, add it there and come back.
 - Every box saves when you leave it, and `Edit` saves with `Save`; there are no other Save buttons.
+- Double-click a line to open its location drop-down without pressing `Edit`. Pick the place and press `Save` (or Enter); Esc puts it back.
 - `Edit Lists` (top right) adds to and deletes from the drop-down lists: suppliers and their unit numbers, other items and locations. Type in an Add box and press `Add`; press `Delete` to take one off. Press `Done` to go back.
 - **United Dairy** is protected: it cannot be deleted, and its unit numbers come from the fleet list. UPPER LOT, LOWER LOT, DEBAG and HOLD always stay on the Locations list.
 - Anything a trailer in the lot is using shows **In the lot** instead of `Delete`. It can be deleted after that trailer leaves the lot.

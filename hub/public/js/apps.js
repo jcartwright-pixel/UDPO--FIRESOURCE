@@ -5,13 +5,14 @@ export const isAdminRole = (roles) => (roles || []).some(r => ['ADMINISTRATOR', 
 export const APPS = [
   { key: 'operations', name: 'Plant & Distribution' }, { key: 'customers', name: 'Customers & Routes' },
   { key: 'fuel', name: 'Fuel Tracking' }, { key: 'udms', name: 'Employees & Compliance' }, { key: 'routes', name: 'Route & Trip Costs' },
-  { key: 'routecost', name: 'Route Cost Analysis' }, { key: 'statements', name: 'Customer Statements' }, { key: 'accident', name: 'Accident & Injury Reporting' }
+  { key: 'routecost', name: 'Route Cost Analysis' }, { key: 'statements', name: 'Customer Statements' }, { key: 'accident', name: 'Accident & Injury Reporting' },
+  { key: 'mapmaker', name: 'MapMaker' }
 ];
 // ticks = the apps saved for this person in People & Access (appAccess), or null for the standard rule. Plant & Distribution
 // always stays on for an Enabled person.
 export function appKeysFor(p, ticks) {
   if (!p || String(p.status || '').trim().toUpperCase() !== 'ACTIVE') return [];
-  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms', 'routes', 'routecost', 'statements'] : []).concat(['accident']);
+  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms', 'routes', 'routecost', 'statements'] : []).concat(['accident']).concat(isAdminRole(p.roles) ? ['mapmaker'] : []);
   return APPS.map(a => a.key).filter(k => k === 'operations' || ticks.indexOf(k) >= 0);
 }
 export const appsFor = (p, ticks) => appKeysFor(p, ticks).map(k => APPS.find(a => a.key === k).name);
@@ -26,6 +27,8 @@ export const LOOK = {
   routes: { color: '#9c2a3a', icon: path('<circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M8 18.5h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16"/>') },
   routecost: { color: '#2f6f8f', icon: path('<path d="M3 20h18"/><path d="M6 20V11M11 20V6M16 20v-6M21 20V9"/>') },
   statements: { color: '#7b3f6e', icon: path('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 12h7M9 15.5h7M9 19h4"/>') },
+  // Joe 11-12-26: the MapMaker (Lucide "map").
+  mapmaker: { color: '#0b6e8a', icon: path('<path d="M14.1 5.1a2 2 0 0 0 1.8 0l3.7-1.9A1 1 0 0 1 21 4.1v12.8a1 1 0 0 1-.6.9l-4.5 2.3a2 2 0 0 1-1.8 0l-4.2-2.1a2 2 0 0 0-1.8 0l-3.7 1.9A1 1 0 0 1 3 19V6.1a1 1 0 0 1 .6-.9l4.5-2.3a2 2 0 0 1 1.8 0z"/><path d="M15 5.8v15M9 3.2v15"/>') },
   accident: { color: '#b3261e', icon: path('<path d="M12 3l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>') },
   roles: { color: '#7a4b12', icon: path('<circle cx="8" cy="8" r="3"/><path d="M2.5 19c0-3 2.5-5.5 5.5-5.5"/><path d="M14 11h7M14 15h7M14 19h7"/><path d="M11.5 11l.8.8 1.4-1.6"/>') },
   links: { color: '#0f6b5c', icon: path('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>') },
@@ -41,6 +44,8 @@ export const LOOK = {
   inventory: { color: '#6b4f1d', icon: path('<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="M3.29 7 12 12l8.71-5"/><path d="m7.5 4.27 9 5.15"/>') },
   sales: { color: '#b8860b', icon: path('<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.5"/>') },
   distribution: { color: '#075b9c', icon: path('<path d="M2 7h12v9H2z"/><path d="M14 10h4l3.5 3.5V16H14"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>') },
+  // Joe 11-11-26: Fleet & Maintenance under Fleet & Costs (Lucide "wrench").
+  maint: { color: '#4b5563', icon: path('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>') },
   // Lucide "list".
   customerlist: { color: '#1d7a46', icon: path('<path d="M3 5h.01M3 12h.01M3 19h.01M8 5h13M8 12h13M8 19h13"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
@@ -88,13 +93,14 @@ export function linkGroups(ops) {
 // Administration screen sits in one area; the menu on Home shows one area at a time, or Everything.
 export const AREAS = [
   { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant', 'inventory'] },
-  // Joe 11-10-26: Route & Trip Costs under Distribution; Route Cost Analysis and a Customer List card under Sales ("it can lead
+  // Joe 11-12-26: MapMaker under Distribution, beside Customers & Routes (every customer and plant on one map).
+  // Joe 11-10-26: Route & Trip Costs under Distribution; a Customer List card under Sales. Route Cost Analysis under Fleet & Costs (Joe 11-11-26) ("it can lead
   // to our complete customer list"). Customer Changes stays in the hub's menu for administrators.
-  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers, delivery routes and what each trip costs', apps: ['distribution', 'customers', 'routes'] },
+  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers, delivery routes and what each trip costs', apps: ['distribution', 'customers', 'mapmaker', 'routes'] },
   // copies: a second card in this area that opens another app's card's address, shown only to people who have that card.
-  { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app, the cost of each route and the complete customer list', apps: ['sales', 'routecost'],
+  { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app and the complete customer list', apps: ['sales'],
     copies: [{ key: 'customerlist', of: 'customers', name: 'Customer List', note: 'The complete customer list: every customer, its route and day, in Customers & Routes' }] },
-  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, fuel prices, tank deliveries and trip fuel', apps: ['fuel'] },
+  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, the cost of each route, and the trucks, trailers and garage', apps: ['fuel', 'routecost', 'maint'] },
   { key: 'office', name: 'Office', note: 'Customer statements', apps: ['statements'] },
   { key: 'people', name: 'People & Safety', note: 'Employee records, drivers, hiring, and reporting an accident or injury', apps: ['udms', 'accident'] },
   { key: 'admin', name: 'Administration', note: 'Who gets in and how everything is set up', admin: true, groups: [

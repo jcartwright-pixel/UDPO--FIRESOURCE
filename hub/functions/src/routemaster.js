@@ -12,7 +12,8 @@
  *   hubRouteMaster/<plant>   every stop on every route day in run order, active customers only, every row with its plant,
  *                            each stop's PALLET USES and case columns (LOW / MIDDLE / AVERAGE / HIGH / LAST 5 WKS), and each
  *                            route day's start time, notes and load map
- *   hubCustomers/<plant>     each active customer's details (chain, account, group, address, phone, keys, notes, map point),
+ *   hubCustomers/<plant>     each active customer's details (chain, account, group, DC (dc, dcName), address, phone, keys, notes, map point;
+ *                            a street address or map point the Customer List lacks is filled from src/addressfill.js and marked),
  *                            the route days it is on, and the active customers on no route
  *
  * They are rebuilt when the Customer List rewrites udclRouteMaster/<plant>, when a week of the weekly route report lands
@@ -49,6 +50,27 @@ function addressLine(c) {
   return [text(c.address), text(c.address2), cityLine].filter(Boolean).join(', ');
 }
 
+/*
+ * Each customer's DC (Joe 11-12-26: "everything should be listed by DC, and that's how the filter should work"). The same
+ * rule as the Customer List's own screens (united-dairy-customer-list public/js/udcl-rules.js: DCS, dcOf, branchOf), copied
+ * here because the Hub only reads the Customer List's records: the DC column also holds route numbers; a number above 80 or
+ * 0, 8, 11, 12, 14 is a route, not a branch, and those are Marietta's books (9), except route 815, which is Uniontown's (30).
+ * A DC is data on the customer, never a plant written into this code; a DC with no name here shows as "DC 61".
+ */
+const DC_NAMES = { 1: 'Martins Ferry', 6: 'Lancaster', 7: 'Fairmont', 9: 'Marietta', 30: 'Uniontown', 50: 'Charleston' };
+const NOT_BRANCH = { 0: 1, 8: 1, 11: 1, 12: 1, 14: 1 }, ROUTE_BRANCH = '9', ROUTE_OWNER = { 815: '30' };
+function dcOf(v) {
+  let t = v === null || v === undefined ? '' : String(v).replace(/\s+/g, ' ').trim().slice(0, 6);
+  if (/^-?\d+\.0+$/.test(t)) t = t.replace(/\.0+$/, '');
+  t = t.replace(/^0+(?=\d)/, '');
+  return /^\d{1,4}$/.test(t) ? t : '';
+}
+function branchOf(v) {
+  const t = dcOf(v);
+  return !t || (!NOT_BRANCH[t] && Number(t) <= 80) ? t : ROUTE_OWNER[t] || ROUTE_BRANCH;
+}
+const dcNameOf = (dc) => (dc ? DC_NAMES[dc] || 'DC ' + dc : '');
+
 /** Low, middle, average, high and the last-5 average of one customer's deliveries on one route day; null with none. */
 function caseColumns(weeks) {
   const w = (weeks || []).filter(x => Number(x[1]) > 0).sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0));
@@ -69,6 +91,53 @@ function weeksByStop(weeklyDocs) {
     (w.stops || []).forEach(st => { const k = text(st.route) + '|' + text(st.customer_no); (by[k] = by[k] || []).push(Object.assign({ week }, st)); });
   });
   return by;
+}
+
+/*
+ * What the Hub found for a customer the Customer List has no street address or no map point for (src/addressfill.js): shown only
+ * where the Customer List has none, and marked so every app can tell (addressFrom 'map point', pointFrom 'address lookup').
+ */
+function withFill(row, c, f, places) {
+  if (f && !f.notFound) {
+    const hasPoint = row.lat !== null && row.lon !== null && !(row.lat === 0 && row.lon === 0);
+    if (!text(c.address) && f.from === 'map point' && text(f.address)) {
+      const city = row.city || text(f.city), state = row.state || text(f.state), zip = row.zip || text(f.zip);
+      Object.assign(row, { address: [text(f.address), [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', '),
+        city, state, zip, addressFrom: 'map point' });
+    }
+    if (!hasPoint && f.from === 'address' && isFinite(Number(f.lat)) && isFinite(Number(f.lon)) && f.lat !== null) Object.assign(row, { lat: Number(f.lat), lon: Number(f.lon), pointFrom: 'address lookup' });
+  }
+  return withCheck(row, c, f, places);
+}
+
+/*
+ * The address check (Joe 11-12-26: "check the validity of each address ... flag each address if something's just not
+ * connecting, whether it's serviced out of a location that's nowhere close ... or if it's a PO box"). addressCheck 'good' or
+ * 'check', and addressCheckWhy in plain words:
+ *   - what the lookup found (src/addressfill.js): not found, only part matched, or far from the customer's own map point;
+ *   - a PO box, which is where the mail goes, not where the store is;
+ *   - more than FAR_FROM_DC miles in a straight line from the DC that serves it. A DC's place is the plant location with the
+ *     same name on Plant Setup (hubPlants); a DC with no place there is not checked.
+ */
+const FAR_FROM_DC = 120;
+const PO_BOX = /\b(p\.?\s*o\.?\s*box|post\s+office\s+box|pob\s+\d|box\s+\d+$)/i;
+function milesApart(a, b) {
+  const rad = (d) => d * Math.PI / 180;
+  const x = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
+  return 2 * 3958.8 * Math.asin(Math.sqrt(x));
+}
+function withCheck(row, c, f, places) {
+  const why = [];
+  if (f && f.verdict === 'check' && text(f.why)) why.push(text(f.why));
+  if (PO_BOX.test(text(c.address)) || PO_BOX.test(text(c.address2))) why.push('The address is a PO box, not where the store is.');
+  const dc = row.dcName && (places || {})[row.dcName.toLowerCase()];
+  if (dc && row.lat !== null && row.lon !== null && !(row.lat === 0 && row.lon === 0)) {
+    const miles = Math.round(milesApart(row, dc));
+    if (miles > FAR_FROM_DC) why.push('It is ' + miles + ' miles from ' + row.dcName + ', the DC that serves it.');
+  }
+  if (why.length) Object.assign(row, { addressCheck: 'check', addressCheckWhy: why.join(' ') });
+  else if ((f && f.verdict === 'good') || dc) Object.assign(row, { addressCheck: 'good', addressCheckWhy: '' });
+  return row;
 }
 
 /**
@@ -94,7 +163,8 @@ function build(plant, plantName, src) {
       if (isOff(c)) { left++; return; }
       const account = text(c.account || s.account);
       const list = weeks[route + '|' + account] || [];
-      rows.push({ plant, route, day, dayName: rd.day, stop: ++stop, load: Number(s.loadSeq) || 0, key: s.key, account,
+      const dc = branchOf(c.dc);
+      rows.push({ plant, route, day, dayName: rd.day, stop: ++stop, load: Number(s.loadSeq) || 0, key: s.key, account, dc, dcName: dcNameOf(dc),
         chain: text(c.chain === undefined || c.chain === null ? s.chain : c.chain), customer: text(c.name || s.name), note: text(s.note),
         palletUses: text((rd.palletUses || {})[s.key]), cases: caseColumns(list.filter(x => Number(x[f]) > 0.5).map(x => [x.week, r1(Number(x[f]))])) });
       (onRoutes[s.key] = onRoutes[s.key] || []).push({ route, day, dayName: rd.day, stop });
@@ -102,12 +172,12 @@ function build(plant, plantName, src) {
     if (stop) days.push({ plant, route, day, dayName: rd.day, stops: stop, startTime: text(rd.startTime), notes: text(rd.notes), map: rd.map || null });
   });
   const people = Object.keys(customers).filter(k => !isOff(customers[k])).sort((a, b) => text(customers[a].name).localeCompare(text(customers[b].name)))
-    .map(k => { const c = customers[k]; return { plant, key: k, account: text(c.account), chain: text(c.chain), name: text(c.name), group: text(c.group),
+    .map(k => { const c = customers[k], dc = branchOf(c.dc); const row = { plant, key: k, account: text(c.account), chain: text(c.chain), name: text(c.name), group: text(c.group), dc, dcName: dcNameOf(dc),
       address: addressLine(c), city: text(c.city), state: text(c.state), zip: text(c.zip), phone: text(c.phone), keys: text(c.keys), notes: text(c.notes),
       lat: isFinite(Number(c.lat)) && c.lat !== null && c.lat !== '' ? Number(c.lat) : null, lon: isFinite(Number(c.lon)) && c.lon !== null && c.lon !== '' ? Number(c.lon) : null,
-      routes: onRoutes[k] || [] }; });
+      routes: onRoutes[k] || [] }; return withFill(row, c, (src.fills || {})[k], src.places); });
   const unrouted = ((src.meta && src.meta.unrouted) || []).filter(x => !isOff(customers[x.key] || {}))
-    .map(x => ({ plant, key: text(x.key), account: text(x.account), chain: text(x.chain), name: text(x.name), day: text(x.day) }));
+    .map(x => { const dc = branchOf((customers[x.key] || {}).dc); return { plant, key: text(x.key), account: text(x.account), chain: text(x.chain), name: text(x.name), day: text(x.day), dc, dcName: dcNameOf(dc) }; });
   const routes = new Set(rows.map(r => r.route));
   const counts = { stops: rows.length, routes: routes.size, routeDays: days.length, customers: people.length, unrouted: unrouted.length,
     inactiveLeftOut: left, withCases: rows.filter(r => r.cases).length, caseWeeks: (src.weekly || []).length };
@@ -133,17 +203,30 @@ function parts(id, rec, listKeys) {
 // The Customer List's record names the plant; without it, fac_martins_ferry reads Martins Ferry.
 const nameOf = (plant) => String(plant).replace(/^fac_/, '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
+/** The places on Plant Setup (hubPlants) by name, lower case: { 'uniontown': { lat, lon } }, for the DC check. */
+async function placesByName(db) {
+  try {
+    const snap = await db.collection('hubPlants').get();
+    const out = {};
+    snap.docs.forEach(d => { const p = d.data() || {}; const lat = Number(p.lat), lon = Number(p.lon);
+      if (p.lat !== null && p.lat !== undefined && Number.isFinite(lat) && Number.isFinite(lon) && p.active !== false && text(p.name)) out[text(p.name).toLowerCase()] = { lat, lon }; });
+    return out;
+  } catch (e) { return {}; }
+}
+
 /** Reads one plant's Customer List records and writes hubRouteMaster/<plant> and hubCustomers/<plant>. */
 async function rebuildPlant(db, plant, stamp, weeklyDocs) {
-  const [cs, rs, meta, source] = await Promise.all([
+  const [cs, rs, meta, source, fills, places] = await Promise.all([
     db.collection(CUSTOMERS).where('plant', '==', plant).get(),
     db.collection(ROUTE_DAYS).where('plant', '==', plant).get(),
     db.collection('private').doc('udcl_' + plant).get(),
-    db.collection(SOURCE).doc(plant).get()
+    db.collection(SOURCE).doc(plant).get(),
+    require('./addressfill').readPlant(db, plant).catch(() => ({})),
+    placesByName(db)
   ]);
   const weekly = weeklyDocs || (await db.collection(WEEKLY).get()).docs.map(d => Object.assign({ id: d.id }, d.data()));
   const name = (source.exists && source.data().plantName) || nameOf(plant);
-  const b = build(plant, name, { customers: cs.docs.map(d => d.data()), routeDays: rs.docs.map(d => d.data()), meta: meta.exists ? meta.data() : null, weekly });
+  const b = build(plant, name, { customers: cs.docs.map(d => d.data()), routeDays: rs.docs.map(d => d.data()), meta: meta.exists ? meta.data() : null, weekly, fills, places });
   const at = stamp || new Date().toISOString();
   const writes = parts(plant, Object.assign(b.routeMaster, { builtAt: at }), ['rows', 'days']).map(([id, r]) => [HUB_ROUTE_MASTER, id, r])
     .concat(parts(plant, Object.assign(b.customers, { builtAt: at }), ['customers', 'unrouted']).map(([id, r]) => [HUB_CUSTOMERS, id, r]));
@@ -162,4 +245,4 @@ async function rebuildAll(db, stamp) {
   return out;
 }
 
-module.exports = { build, caseColumns, parts, rebuildPlant, rebuildAll, HUB_ROUTE_MASTER, HUB_CUSTOMERS, SOURCE, WEEKLY };
+module.exports = { branchOf, dcNameOf, build, caseColumns, parts, rebuildPlant, rebuildAll, HUB_ROUTE_MASTER, HUB_CUSTOMERS, SOURCE, WEEKLY };

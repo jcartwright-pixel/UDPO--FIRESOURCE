@@ -388,15 +388,31 @@ rows.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (b) {
     if (b.disabled || !canSave()) return;
-    if (b.dataset.edit) { editing = b.dataset.edit; editValue = ''; render(true); const s = rows.querySelector('select[data-loc]'); if (s) s.focus(); }
+    if (b.dataset.edit) startEdit(b.dataset.edit);
     else if (b.dataset.save) { const s = rows.querySelector('select[data-loc]'); placeRow(rowOf(b.dataset.save), s ? s.value : ''); }
     return;
   }
   if (e.target.closest('select')) return;
   const r = e.target.closest('[data-id]');
   if (!r) return;
-  mode = ''; newLocation = false; chosen = r.dataset.id; setUrl(); render(true);
+  // Joe 11-11-26: "Instead of having to hit edit, I should be able to just double click on this to bring the drop down box down."
+  // A double-click on a line opens its location drop-down, the same as Edit. The first click redraws the list, so the two
+  // clicks are matched by the line, not by the element.
+  const now = Date.now(), twice = lastClick.id === r.dataset.id && now - lastClick.at < 500;
+  lastClick = twice ? { id: '', at: 0 } : { id: r.dataset.id, at: now };
+  mode = ''; newLocation = false; chosen = r.dataset.id; setUrl();
+  if (twice && canSave()) startEdit(r.dataset.id, true); else render(true);
 });
+// Edit (or a double-click on the line): the line's location becomes a drop-down with the focus; a double-click also
+// opens its list of places, ready to pick.
+let lastClick = { id: '', at: 0 };
+function startEdit(id, open) {
+  editing = id; editValue = ''; render(true);
+  const s = rows.querySelector('select[data-loc]');
+  if (!s) return;
+  s.focus();
+  if (open) try { if (s.showPicker) s.showPicker(); } catch (err) { /* older browsers: the drop-down has the focus and opens on a press */ }
+}
 rows.addEventListener('change', e => { if (e.target.dataset.loc) editValue = e.target.value; });
 rows.addEventListener('keydown', e => {
   if (!e.target.dataset.loc) return;

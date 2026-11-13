@@ -28,7 +28,8 @@ const text = (v, max) => String(v === null || v === undefined ? '' : v).replace(
 // barcode for the Zebra labels; addMilkProducts brings the plant's milk products (its Products list) into Inventory.
 // Joe 11-10-26 (the four inventories): setPlace keeps where a product is kept (its area and spot); countMany is the Count Walk,
 // every count typed or scanned in one area saved at once, each the same as one Count.
-const STOCK_OPS = ['use', 'setLow', 'setUses', 'label', 'addMilkProducts', 'setPlace', 'countMany'];
+// Joe 11-12-26: setLists puts a product on the plant's own named lists (Caps, Labels ...), so Inventory can show one list at a time.
+const STOCK_OPS = ['use', 'setLow', 'setUses', 'label', 'addMilkProducts', 'setPlace', 'countMany', 'setLists'];
 const PRODUCT_OPS = ['addProduct', 'editProduct', 'removeProduct', 'linkBarcode', 'count'].concat(STOCK_OPS);
 const OPS = PRODUCT_OPS.concat(['receive']);
 const MAX_QTY = 9999999;
@@ -99,6 +100,13 @@ function validate(input, out, SaveError) {
   }
   if (out.op === 'setLow') { out.low = whole(input.low, 'the low mark', SaveError, true); return out; }
   if (out.op === 'label') return out;
+  if (out.op === 'setLists') {
+    const raw = Array.isArray(input.lists) ? input.lists : String(input.lists || '').split(',');
+    const seen = new Set();
+    out.lists = raw.map(R.listName).filter(n => n && !seen.has(n.toUpperCase()) && seen.add(n.toUpperCase()));
+    if (out.lists.length > R.MAX_LISTS_PER_ITEM) throw new SaveError('BAD_REQUEST', 'A product can be on up to ' + R.MAX_LISTS_PER_ITEM + ' lists.');
+    return out;
+  }
   if (out.op === 'setPlace') { out.area = text(input.area, R.MAX_AREA); out.spot = text(input.spot, R.MAX_SPOT); return out; }
   if (out.op === 'setUses') {
     if (!Array.isArray(input.uses) || input.uses.length > R.MAX_USES) throw new SaveError('BAD_REQUEST', 'A product can use up to ' + R.MAX_USES + ' things.');
@@ -255,6 +263,8 @@ async function stockOp(tx, db, items, all, req, email, stamp, logRef, mode, Save
       writeMove(tx, db, moveId(req, 0), move);
     } else if (req.op === 'setLow') {
       after = Object.assign({}, before, { low: req.low, editedAt: stamp, editedBy: email });
+    } else if (req.op === 'setLists') {
+      after = Object.assign({}, before, { lists: req.lists, editedAt: stamp, editedBy: email });
     } else if (req.op === 'setPlace') {
       after = Object.assign({}, before, { area: req.area, spot: req.spot, editedAt: stamp, editedBy: email });
     } else if (req.op === 'setUses') {

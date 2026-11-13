@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear, localCalls, localAdmin, localKeys } = require('../helpers.cjs');
+const { db, clear, localCalls, localAdmin, localKeys, localEstimator, estimatorAsked } = require('../helpers.cjs');
 const R = require('../../../../functions/src/rights');
 
 const HOSTING = process.argv[2] || 'http://127.0.0.1:5000';
@@ -20,6 +20,7 @@ async function open(browser, email, size, page) {
   await localCalls(ctx);
   await localAdmin(ctx);
   await localKeys(ctx);
+  await localEstimator(ctx);
   const p = await ctx.newPage();
   p.on('pageerror', e => { throw e; });
   await p.goto(HOSTING + '/' + (page || 'index.html') + ((page || '').indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + email);
@@ -36,10 +37,10 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     let p = await open(browser, 'pat.admin@uniteddairy.com');
     await p.waitForSelector('#tiles a');
     // Home by area (11-5-26): the cards sit under their area, in the area's order.
-    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['plant', 'inventory', 'distribution', 'customers', 'routes', 'sales', 'routecost', 'customerlist', 'fuel', 'statements', 'udms', 'accident']);
-    assert.deepEqual(await p.$$eval('#tiles section.area', s => s.map(x => x.dataset.area + ':' + x.querySelectorAll('a').length)), ['plant:2', 'distribution:3', 'sales:3', 'fleet:1', 'office:1', 'people:2']);
+    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['plant', 'inventory', 'distribution', 'customers', 'mapmaker', 'routes', 'sales', 'customerlist', 'fuel', 'routecost', 'maint', 'statements', 'udms', 'accident']);
+    assert.deepEqual(await p.$$eval('#tiles section.area', s => s.map(x => x.dataset.area + ':' + x.querySelectorAll('a').length)), ['plant:2', 'distribution:4', 'sales:2', 'fleet:3', 'office:1', 'people:2']);
     assert.equal(await p.textContent('#hello'), 'Good to see you, Pat');
-    assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area + ' ' + a.querySelector('.area-n').textContent)), ['all 20', 'plant 2', 'distribution 3', 'sales 3', 'fleet 1', 'office 1', 'people 2', 'admin 8']);
+    assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area + ' ' + a.querySelector('.area-n').textContent)), ['all 22', 'plant 2', 'distribution 4', 'sales 2', 'fleet 3', 'office 1', 'people 2', 'admin 8']);
     assert.equal(await p.getAttribute('#area-menu a[data-area="all"]', 'aria-current'), 'true', 'Everything shows first');
     assert.ok(!(await p.isVisible('#practice-band')), 'the live hub has no practice band');
     // Joe 11-9-26: the practice hub opens only when picked; administrators pick it at the bottom of Administration.
@@ -62,8 +63,11 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isHidden('#plant-box'));
     assert.match(await p.getAttribute('#tiles a[data-app="sales"]', 'href'), /\/sales\.html$/, 'Sales App opens the salespeople\'s own app');
     assert.match(await p.getAttribute('#tiles a[data-app="inventory"]', 'href'), /\/inventory\.html$/, 'Inventory opens the Inventory screen');
-    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant Operations', 'Inventory', 'Route Distribution', 'Customers & Routes', 'Route & Trip Costs', 'Sales App', 'Route Cost Analysis', 'Customer List', 'Fuel Tracking', 'Customer Statements', 'Employees & Compliance', 'Accident & Injury Reporting']);
-    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 12, 'every card has its picture');
+    // Joe 11-12-26: the MapMaker's card is under Distribution and opens the map in a new tab.
+    assert.match(await p.getAttribute('#tiles a[data-app="mapmaker"]', 'href'), /-map\.web\.app\/$/, 'MapMaker opens the map');
+    assert.equal(await p.getAttribute('#tiles a[data-app="mapmaker"]', 'target'), '_blank');
+    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant Operations', 'Inventory', 'Route Distribution', 'Customers & Routes', 'MapMaker', 'Route & Trip Costs', 'Sales App', 'Customer List', 'Fuel Tracking', 'Route Cost Analysis', 'Fleet & Maintenance', 'Customer Statements', 'Employees & Compliance', 'Accident & Injury Reporting']);
+    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 14, 'every card has its picture');
     await shot(p, 'hub-admin-1920');
     // Pick an area: only its cards show, the address keeps it, and Back goes to Everything.
     await p.click('#area-menu a[data-area="fleet"]');
@@ -80,7 +84,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.equal(await p.$$eval('a[data-admin="changes"]', a => a.length), 0, 'Customer Changes is in the menu, not on Home');
     await p.click('#area-menu a[data-area="sales"]');
     await p.waitForSelector('#area-menu a[data-area="sales"][aria-current]');
-    assert.deepEqual(await p.$$eval('section.area[data-area="sales"] a strong', s => s.map(x => x.textContent)), ['Sales App', 'Route Cost Analysis', 'Customer List']);
+    assert.deepEqual(await p.$$eval('section.area[data-area="sales"] a strong', s => s.map(x => x.textContent)), ['Sales App', 'Customer List']);
     assert.equal(await p.getAttribute('#tiles a[data-app="customerlist"]', 'href'), await p.getAttribute('#tiles a[data-app="customers"]', 'href'), 'Customer List opens Customers & Routes');
     await p.goBack();
     await p.goBack();
@@ -120,8 +124,8 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.equal(await p.$$eval('#rows tr[data-email]', r => r.length), 2);
     // Each app is a tick box, ticked for what each person can open now.
     const ticks = (email) => p.$$eval('#rows tr[data-email="' + email + '"] input[data-app]', b => b.map(x => x.dataset.app + (x.checked ? '+' : '-')).join(' '));
-    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel- udms- routes- routecost- statements- accident+');
-    assert.equal(await ticks('pat.admin@uniteddairy.com'), 'operations+ customers+ fuel+ udms+ routes+ routecost+ statements+ accident+');
+    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel- udms- routes- routecost- statements- accident+ mapmaker-');
+    assert.equal(await ticks('pat.admin@uniteddairy.com'), 'operations+ customers+ fuel+ udms+ routes+ routecost+ statements+ accident+ mapmaker+');
     assert.ok(await p.isDisabled('#rows tr[data-email="pat.admin@uniteddairy.com"] input[data-app="fuel"]'), 'nobody unticks their own apps');
     assert.ok(await p.isDisabled('#rows tr[data-email="sam.sales@uniteddairy.com"] input[data-app="operations"]'), 'Plant & Distribution stays on');
     // Tick Fuel Tracking for Sam: it saves at once, and Sam's Home gets the Fuel card.
@@ -129,7 +133,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('#list-msg.good');
     assert.match(await p.textContent('#list-msg'), /Sam Sales can now open Fuel Tracking/);
     assert.deepEqual((await db().collection('appAccess').doc('sam.sales@uniteddairy.com').get()).data().apps, ['operations', 'customers', 'fuel', 'accident']);
-    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel+ udms- routes- routecost- statements- accident+');
+    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel+ udms- routes- routecost- statements- accident+ mapmaker-');
     assert.equal(await p.$eval('#edit', b => b.querySelector('.pblock') === null), true, 'ticking does not open the person');
     // The page scrolls (Joe 11-3-26: "You can't scroll on this screen").
     await p.setViewportSize({ width: 1280, height: 400 });
@@ -313,7 +317,12 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await db().collection('private').doc('mocreo').set({ apiKey: 'made-up-key-0000-1234', assetId: 'asset-77', savedAt: '2026-10-01T12:00:00Z', savedBy: 'pat.admin@uniteddairy.com' });
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'keys.html');
     await p.waitForSelector('.key-card[data-key="mocreo"]');
-    assert.equal(await p.$$eval('.key-card', c => c.length), 5);
+    assert.equal(await p.$$eval('.key-card', c => c.length), 6);
+    // HERE has its own card, asked through the Route Estimator's call with provider here (PC Miler's asks with none).
+    await p.waitForSelector('.key-card[data-key="here"] .pill');
+    assert.match(await p.textContent('.key-card[data-key="here"]'), /HERE \(Route & Trip: miles, drive time, tolls and addresses\)[\s\S]*Not set up/);
+    assert.ok(estimatorAsked.some(d => d.area === 'key' && d.provider === 'here' && d.op === 'status'), 'the HERE card asks for provider here');
+    assert.ok(estimatorAsked.some(d => d.area === 'key' && !d.provider && d.op === 'status'), 'the PC Miler card still asks as before');
     const mocreo = await p.textContent('.key-card[data-key="mocreo"]');
     assert.match(mocreo, /ends in 1234/);
     assert.ok(mocreo.indexOf('made-up-key') < 0 && (await p.content()).indexOf('made-up-key') < 0, 'the saved key never reaches the page');
@@ -504,12 +513,22 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     // Plant Setup: each set-up screen opens in Plant & Distribution on the plant picked.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'plant-setup.html');
     await p.waitForSelector('.lc-card[data-page="shifts.html"] a');
-    assert.equal(await p.$$eval('.lc-card', c => c.length), 7);
+    assert.equal(await p.$$eval('#setup .lc-card', c => c.length), 7);
     assert.match(await p.getAttribute('.lc-card[data-page="shifts.html"] a', 'href'), /\/shifts\.html$/);
     await p.selectOption('#plant', 'fac_charleston');
     assert.match(await p.getAttribute('.lc-card[data-page="crew.html?view=setup"] a', 'href'), /\/crew\.html\?view=setup&plant=fac_charleston$/);
     assert.match(await p.textContent('.lc-card[data-page="uploads.html"] a'), /Open for Charleston/);
     assert.equal(await p.getAttribute('.lc-card[data-page="uploads.html"] a', 'target'), '_blank');
+    // Where each plant is (hubPlants): the hub fills in every plant; an administrator types a map point and saves.
+    await p.waitForSelector('#plant-places [data-place]');
+    assert.ok(await p.$$eval('#plant-places [data-place]', c => c.length) >= 3, 'every plant has a card');
+    const up = await p.$$eval('#plant-places [data-place]', cs => cs.findIndex(c => /Uniontown/.test(c.querySelector('h3').textContent)));
+    await p.fill('[data-place="' + up + '"] [data-f="lat"]', '39.9');
+    await p.fill('[data-place="' + up + '"] [data-f="lon"]', '-79.7');
+    await p.click('[data-save-place="' + up + '"]');
+    await p.waitForFunction((i) => /Saved by pat\.admin/.test(document.querySelector('[data-place="' + i + '"]').textContent), up);
+    const savedPlant = (await db().collection('hubPlants').doc('fac_uniontown').get()).data();
+    assert.deepEqual([savedPlant.lat, savedPlant.lon, savedPlant.source], [39.9, -79.7, 'hub']);
     await shot(p, 'hub-plant-setup-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'plant-setup.html');
     await p.waitForSelector('.lc-card a');
@@ -546,13 +565,30 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);
     assert.equal(await p.$$eval('.lc-card', c => c.length), 0);
+    // Address Check (Joe 11-12-26): the customers whose address needs a look, with why. Administrators only.
+    await db().collection('hubCustomers').doc('fac_uniontown').set({ plant: 'fac_uniontown', customers: [
+      { plant: 'fac_uniontown', key: 'fac_uniontown__901', account: '901', name: 'SAMPLE BOX STORE', dcName: 'Uniontown', address: 'PO Box 9, Sampletown, PA', addressCheck: 'check', addressCheckWhy: 'The address is a PO box, not where the store is.' },
+      { plant: 'fac_uniontown', key: 'fac_uniontown__902', account: '902', name: 'SAMPLE GOOD STORE', dcName: 'Uniontown', address: '2 Made-Up Rd, Sampletown, PA', addressCheck: 'good' }] });
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'addresses.html');
+    await p.waitForSelector('#list tr[data-key]');
+    assert.equal(await p.$$eval('#list tr[data-key]', r => r.length), 1);
+    assert.match(await p.textContent('#list tr[data-key="fac_uniontown__901"]'), /PO box/);
+    assert.match(await p.textContent('#counts'), /1 to check, 1 good, out of 2/);
+    await p.fill('#find', 'nothing like it');
+    assert.match(await p.textContent('#list'), /Nothing to check/);
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'addresses.html');
+    await p.waitForSelector('#list tr[data-key]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Address Check: no sideways page scroll on a phone');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'addresses.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'email.html');
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);
 
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
-    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['plant', 'inventory', 'distribution', 'customers', 'sales', 'customerlist', 'fuel', 'udms', 'accident'], 'Sam\'s Home shows the apps ticked for Sam');
+    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['plant', 'inventory', 'distribution', 'customers', 'sales', 'customerlist', 'fuel', 'maint', 'udms', 'accident'], 'Sam\'s Home shows the apps ticked for Sam');
     assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area)), ['all', 'plant', 'distribution', 'sales', 'fleet', 'people'], 'no Administration area for Sam');
     assert.ok(!(await p.isVisible('a[data-admin="people"]')), 'someone who is not an administrator does not see Administration');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'keys.html');

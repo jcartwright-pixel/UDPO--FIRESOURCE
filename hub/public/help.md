@@ -24,23 +24,25 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Route Cost Analysis**: each month's delivery cost by route and stop: cost per case, per stop and per day on the road.
 - **Customer Statements** (the Statement Center): email, mail and print customer statements for every location, and keep the statement customer list. Pick the location at the top once it opens.
 - **Accident & Injury Reporting**: report an accident or injury from a phone, tablet or computer.
+- **MapMaker**: every customer and plant on one map. Pins are colored by route, delivery day or plant, with the stop number in the pin; search, filter and sort the list beside the map; upload an Excel or CSV list and every row is pinned.
 - **Sales App** (UD Sales): the salespeople's own app: where every route is now, with a map, and the customers on each route. It only shows; nothing can be changed from it. On a phone, add it to the home screen as **UD Sales**.
+- **Fleet & Maintenance**: tractors, trucks and trailers, their issues, garage work orders and fleet service. It opens the Fleet & Maintenance screen in Plant & Distribution. Everyone active sees the card; what they may do there is set by their role.
 - **Inventory**: the supplies and milk products for each plant: what is on hand, counts, what came in (the receiving log) and every change. It opens the Inventory screen in Plant & Distribution. Everyone active sees the card; who may count or change stock is set by their role there.
 
 ### The areas
 - **Plant**: **Plant Operations**, the plant side of Plant & Distribution (production, the plant floor, loadout, quality and inventory), and **Inventory**, its own card for the plant's stock.
-- **Distribution**: **Route Distribution**, the distribution side of Plant & Distribution (dispatch, drivers, trucks, fleet and the garage), Customers & Routes, and Route & Trip Costs.
-- **Sales**: the **Sales App**, the salespeople's own app, Route Cost Analysis, and **Customer List**, which opens the complete customer list in Customers & Routes (anyone who has the Customers & Routes card sees it).
-- **Fleet & Costs**: Fuel Tracking.
+- **Distribution**: **Route Distribution**, the distribution side of Plant & Distribution (dispatch, drivers, trucks, fleet and the garage), Customers & Routes, **MapMaker**, and Route & Trip Costs.
+- **Sales**: the **Sales App**, the salespeople's own app, and **Customer List**, which opens the complete customer list in Customers & Routes (anyone who has the Customers & Routes card sees it).
+- **Fleet & Costs**: Fuel Tracking, Route Cost Analysis and **Fleet & Maintenance**.
 - **Office**: Customer Statements.
 - **People & Safety**: Employees & Compliance and Accident & Injury Reporting.
-- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL). **Customer Changes** (changes to the route customer list from every app, waiting for approval) is in the hub's menu, not on Home.
+- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL). **Customer Changes** (changes to the route customer list from every app, waiting for approval) and **Address Check** (customers whose address needs a look) are in the hub's menu, not on Home.
 
 ### Which cards you see
-- **Plant & Distribution**, **Customers & Routes**, the **Sales App**, **Inventory** and **Accident & Injury Reporting**: everyone who is active on the Users list. The Sales App and Inventory have nothing to tick in People & Access: any United Dairy account may open it.
-- **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs**, **Route Cost Analysis** and **Customer Statements**: administrators, and anyone an administrator ticks for it in **People & Access**. Employees & Compliance keeps its own access list too, so it checks again when it opens.
+- **Plant & Distribution**, **Customers & Routes**, the **Sales App**, **Inventory**, **Fleet & Maintenance** and **Accident & Injury Reporting**: everyone who is active on the Users list. The Sales App, Inventory and Fleet & Maintenance have nothing to tick in People & Access: any United Dairy account may open it.
+- **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs**, **Route Cost Analysis**, **Customer Statements** and **MapMaker**: administrators, and anyone an administrator ticks for it in **People & Access**. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio, PC Miler and HERE, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
 
 > On the practice hub, **Route & Trip Costs**, **Customer Statements** and **Accident & Injury Reporting** open the live ones, because they have no practice copy yet. Their cards say so. **Employees & Compliance** opens its practice copy, with made-up people.
 
@@ -49,6 +51,8 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 > A yellow **Practice copy** line at the top means you are on the practice hub: its cards open the practice copies of the apps, with made-up or copied data. A card for an app with no practice copy says it opens the live one, so take care there. Press `Open the live hub` to go to the real one (ud-distribution-hub.web.app).
 
 > The plant pop-up's numbers are the same as Operations' all-plants overview, read when the pop-up opens. Close it and press the card again for fresh numbers.
+
+> A card that says **Not on the web yet** is an app still being set up; it opens nothing until it is on the web.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -183,7 +187,7 @@ screens: email.html
 id: plant-setup
 screens: plant-setup.html
 
-**Plant Setup** opens Plant & Distribution's set-up screens for one plant: the **Upload Center**, **Plant Shifts**, **Location Areas**, **Menu Setup**, the **Plant Schedule Setup**, and Plant Maintenance's **Maintenance Schedule Setup** and **Maintenance Equipment**. The screens stay in Plant & Distribution and save there as they always have. Administrators only.
+**Plant Setup** says where each plant is on the map, and opens Plant & Distribution's set-up screens for one plant: the **Upload Center**, **Plant Shifts**, **Location Areas**, **Menu Setup**, the **Plant Schedule Setup**, and Plant Maintenance's **Maintenance Schedule Setup** and **Maintenance Equipment**. The screens stay in Plant & Distribution and save there as they always have. Administrators only.
 
 1. Pick the **Plant** at the top.
 2. Press `Open for` on a screen's card. It opens in Plant & Distribution on that plant, in a new tab, so the hub stays open.
@@ -197,14 +201,26 @@ screens: plant-setup.html
 
 !> Do not set up one plant's screen with another plant picked. Check the plant's name on the button before you open it.
 
+### Where each plant is
+Under the set-up screens, **Where each plant is** has a card for every plant with its street address and map point. The **MapMaker** shows each plant as a pin from here, and works out **Miles from a plant** from it. The hub fills these in by itself from Route & Trip's starting points and adds any new plant it finds on the customer list.
+
+1. To fix a plant's place, change its **Street address** and press `Save`. The map point is found for you.
+2. If the address is not found, type the **Map point** yourself (north, then west with a minus, like 39.9 and -79.7) and press `Save`.
+3. To add a plant, press `Add a plant`, type its name and address, and press `Save`.
+4. Untick **On the map** to hide a plant and its customers from the MapMaker.
+
+> A plant you save here is kept as you saved it; the hub never fills it in again.
+
+!> Do not untick **On the map** for a plant that still has customers you want to see on the MapMaker.
+
 ## Keys & Connections
 id: keys
 screens: keys.html
 
-**Keys & Connections** holds the sign-ins the apps use to reach other companies: **Verizon Connect GPS**, **RedZone**, **MOCREO thermometers** and **Twilio texts** for Plant & Distribution, and **PC Miler (Trimble)** for Route & Trip Costs. They are the same keys as before, kept in the same place, so nothing has to be set up again. Administrators only.
+**Keys & Connections** holds the sign-ins the apps use to reach other companies: **Verizon Connect GPS**, **RedZone**, **MOCREO thermometers** and **Twilio texts** for Plant & Distribution, and **PC Miler (Trimble)** and **HERE** for Route & Trip Costs (HERE is the second choice for miles, drive time, tolls and addresses). They are the same keys as before, kept in the same place, so nothing has to be set up again. Administrators only.
 
 1. Each card says what the sign-in is for, what is saved, and how its last test went.
-2. To check one, press `Test Connection`. A green line says it works; a red line says what went wrong. For PC Miler, the test looks up the Uniontown plant and routes a truck to Martins Ferry.
+2. To check one, press `Test Connection`. A green line says it works; a red line says what went wrong. For PC Miler, the test looks up the Uniontown plant and routes a truck to Martins Ferry. For HERE, the test checks the key with HERE and says what came back.
 3. To replace a key, open **Replace**, paste only what changes (an empty box keeps what is saved), and press `Save`. Then press `Test Connection`.
 4. For Twilio, type a phone number and press `Send test text`. The practice copy never sends texts, so there it says "not sent".
 5. To take a key away, press `Remove key`, then press it again. That connection stops until a key is saved again.
@@ -219,7 +235,7 @@ screens: keys.html
 
 !> Do not paste a key into a chat, an email or a text. Paste it only into this screen.
 
-!> Do not press `Remove key` to test something. The trucks, products, thermometers, texts or PC Miler miles and tolls stop until the key is saved again.
+!> Do not press `Remove key` to test something. The trucks, products, thermometers, texts or the PC Miler or HERE miles and tolls stop until the key is saved again.
 
 ## Accounting Numbers
 id: accounting
@@ -278,6 +294,26 @@ Every change to the route customer list comes here first, from every app: Custom
 
 !> Do not approve a change you have not read. Once it is saved, the customer list and every app that reads it change.
 
+
+## Address Check
+id: addresses
+screens: addresses.html
+
+**Address Check** lists the customers whose address needs a look. Every customer's address is looked up on the map once, and again when it changes, and the hub fills in what is missing: the street address at a customer's map point when there is no address, and the map point for an address when there is no map point. Administrators only. It is in the hub's menu.
+
+A customer is on the list when:
+- the address could not be found on the map, or only part of it matched;
+- the address is more than a quarter mile from the customer's own map point (the GPS point brought in from Verizon);
+- the customer is more than 120 miles from the DC that serves it (the DC's place is the plant location with the same name on **Plant Setup**, under **Where each plant is**);
+- the address is a PO box, which is where the mail goes, not where the store is.
+
+1. Pick the **Plant**, or leave **Every plant**.
+2. Type in **Find** to look for a customer by name, account or address.
+3. Read **Why** on each line, then fix the address in **Customers & Routes**. The next hourly check takes it off the list.
+
+> The first check of every customer takes a few hours, a share at a time. The line at the top says how many have been looked at so far.
+
+!> Do not change a good address just because the map point is a little off. A store at the back of a big lot can be a few hundred feet from its street address.
 ## Daily BOL
 id: bol
 screens: bol.html

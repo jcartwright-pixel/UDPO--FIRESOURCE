@@ -41,7 +41,7 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="tabs seg inv-tabs" id="tabs" role="tablist" aria-label="Inventory"><button type="button" data-tab="onhand">On Hand</button><button type="button" data-tab="walk">Count Walk</button><button type="button" data-tab="log">Receiving Log</button><button type="button" data-tab="history">History</button></div>
+      <div class="tabs seg inv-tabs" id="tabs" role="tablist" aria-label="Inventory"><button type="button" data-tab="lists">Lists</button><button type="button" data-tab="onhand">On Hand</button><button type="button" data-tab="walk">Count Walk</button><button type="button" data-tab="log">Receiving Log</button><button type="button" data-tab="history">History</button></div>
       <!-- Joe 11-10-26 ("separate the raw and the cooler products ... the maintenance products ... three, maybe four separations"):
            four inventories, each its own tab, for On Hand and the Count Walk. Supplies and Milk Products (Joe 11-4-26) are
            Plant Supplies and Cooler. -->
@@ -51,6 +51,14 @@
         <button type="button" id="low-pop" class="inv-lowpop" hidden></button>
       </div>
 
+      <!-- Joe 11-12-26 ("all on the same list, but be able to only view in the inventory what I want to see ... whenever I pull up
+           the inventory, it'll actually show me the different lists"): Inventory opens on its lists. Every product stays on the
+           one product list; each card shows only part of it: an inventory, a kind in it, or one of the plant's own named lists. -->
+      <section id="tab-lists" class="inv-tab" hidden>
+        <div id="lists-body" class="inv-lists"></div>
+        <div class="foot" id="lists-foot"></div>
+      </section>
+
       <section id="tab-onhand" class="inv-tab" hidden>
         <!-- Joe 11-4-26 ("a mix of everything ... internal inventory on all my milk products ... a separate type"): Supplies (what
              suppliers send) and Milk Products (what our lines make) are two types; each product can be taken out (TAKE OUT), counted,
@@ -58,6 +66,7 @@
         <div class="actions inv-filters">
           <!-- Joe 11-10-26 ("where I can manually type it in. Or, of course, scan it in"): type a name, or scan a barcode with the
                scanner (it types the code and Enter) or the camera; a scan finds the product and opens its Count. -->
+          <button type="button" id="oh-list" class="inv-onlist" hidden></button>
           <input type="search" id="oh-search" placeholder="Find or scan a product" aria-label="Find or scan a product">
           <button type="button" class="inv-cam" data-camera="onhand" hidden>Scan with camera</button>
           <button type="button" id="oh-low" class="inv-low" aria-pressed="false">Low only</button>
@@ -155,9 +164,11 @@
     const L = window.UDLogic, U = window.UDPlant, S = window.UDScan;
     const params = new URLSearchParams(location.search);
     const PERIODS = [['7', '7 days'], ['30', '30 days'], ['90', '90 days'], ['365', 'Year']];
-    const TABS = ['onhand', 'walk', 'log', 'history'];
+    const TABS = ['lists', 'onhand', 'walk', 'log', 'history'];
     const TYPES = U.INVENTORY_SECTIONS.map(x => x.key);
-    let tab = TABS.indexOf(params.get('tab')) >= 0 ? params.get('tab') : 'onhand';
+    // Opened with no tab and no inventory picked (the menu's Inventory, the Hub's card): the lists first (Joe 11-12-26).
+    let tab = TABS.indexOf(params.get('tab')) >= 0 ? params.get('tab') : params.get('type') || params.get('list') ? 'onhand' : 'lists';
+    let ohList = U.listName(params.get('list'));
     let plant = params.get('plant') || '', period = '30', search = '', supplier = '', person = null, app = {}, db = null;
     let ohSearch = '', ohKind = '', ohSupplier = '', ohLow = false, editing = null, panel = null, hProduct = params.get('product') || '';
     let ohType = TYPES.indexOf(params.get('type')) >= 0 ? params.get('type') : 'supplies', lineNames = [], ohArea = '', wArea = '';
@@ -186,10 +197,42 @@
       TABS.forEach(t => { document.getElementById('tab-' + t).hidden = t !== tab; });
       document.getElementById('products-open').hidden = !canCount();
       document.getElementById('types-bar').hidden = tab !== 'onhand' && tab !== 'walk';
-      document.querySelectorAll('[data-type]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.type === ohType)));
+      document.querySelectorAll('[data-type]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.type === ohType && !(ohList && tab === 'onhand'))));
       document.querySelectorAll('[data-camera]').forEach(b => { b.hidden = !cameraReads(); });
       lowCheck();
-      if (tab === 'onhand') renderOnHand(); else if (tab === 'walk') renderWalk(); else if (tab === 'history') renderHistory(); else renderLog();
+      if (tab === 'lists') renderLists(); else if (tab === 'onhand') renderOnHand(); else if (tab === 'walk') renderWalk(); else if (tab === 'history') renderHistory(); else renderLog();
+    }
+
+    /* ---------- Lists (Joe 11-12-26) ---------- */
+    // Each card is part of the one product list: an inventory, a kind in it, or one of the plant's own named lists (a product
+    // is put on those with Lists on its line). Picking a card opens On Hand showing only that part.
+    const KIND_NAMES = { Ingredient: 'Ingredients', Chemical: 'Chemicals', Other: 'Other supplies', 'Maintenance Part': 'Parts', Safety: 'Safety gear' };
+    function listCard(attrs, name, list) {
+      const low = list.filter(U.inventoryLow).length;
+      return '<button type="button" class="inv-list-card' + (low ? ' has-low' : '') + '" ' + attrs + '><strong>' + escapeHtml(name) + '</strong><span>' +
+        list.length + ' product' + (list.length === 1 ? '' : 's') + (low ? ' · <b>' + low + ' low</b>' : '') + '</span></button>';
+    }
+    function renderLists() {
+      const all = items || [];
+      if (!items) { document.getElementById('lists-body').innerHTML = '<p class="empty">Loading Inventory&hellip;</p>'; return; }
+      const groups = U.INVENTORY_SECTIONS.map(s => {
+        const mine = all.filter(i => typeOf(i) === s.key);
+        const kinds = s.kinds.length < 2 ? '' : s.kinds.map(k => listCard('data-pick-type="' + s.key + '" data-pick-kind="' + escapeHtml(k) + '"', KIND_NAMES[k] || k, mine.filter(i => i.kind === k))).join('');
+        return '<section class="inv-list-group" data-group="' + s.key + '"><h2>' + escapeHtml(s.name) + '</h2><div class="inv-list-cards">' + listCard('data-pick-type="' + s.key + '"', 'All ' + s.name, mine) + kinds + '</div></section>';
+      });
+      const own = U.inventoryLists(all);
+      groups.push('<section class="inv-list-group" data-group="own"><h2>My lists</h2><div class="inv-list-cards">' +
+        (own.map(l => listCard('data-pick-list="' + escapeHtml(l.name) + '"', l.name, l.items)).join('') ||
+          '<p class="inv-list-none">No lists of your own yet. On On Hand, press Lists on a product and type a list name, for example CAPS or LABELS.</p>') + '</div></section>');
+      document.getElementById('lists-body').innerHTML = groups.join('');
+      const low = all.filter(U.inventoryLow).length;
+      document.getElementById('lists-foot').textContent = 'Every list is part of the one product list: ' + all.length + ' product' + (all.length === 1 ? '' : 's') + (low ? ', ' + low + ' low (red)' : '') + '. Pick a list to see only it.';
+    }
+    function pickList(b) {
+      editing = null; panel = null; ohSearch = ''; document.getElementById('oh-search').value = ''; ohSupplier = ohArea = ''; ohLow = false;
+      if (b.dataset.pickList) { ohList = b.dataset.pickList; ohKind = ''; }
+      else { ohList = ''; ohType = b.dataset.pickType; ohKind = b.dataset.pickKind || ''; }
+      tab = 'onhand'; keepType(); ohError(''); render();
     }
 
     /* ---------- On Hand ---------- */
@@ -208,7 +251,7 @@
       if (!ck) return '<button type="button" data-history="' + escapeHtml(i.id) + '">History</button>';
       return '<button type="button" data-use="' + escapeHtml(i.id) + '">Take out</button><button type="button" data-count="' + escapeHtml(i.id) + '">Count</button>' +
         (U.isMilk(i) ? '<button type="button" data-uses="' + escapeHtml(i.id) + '">Uses</button>' : '') + '<button type="button" data-place="' + escapeHtml(i.id) + '">Area</button>' +
-        '<button type="button" data-label="' + escapeHtml(i.id) + '">Label</button><button type="button" data-history="' + escapeHtml(i.id) + '">History</button>';
+        '<button type="button" data-lists="' + escapeHtml(i.id) + '">Lists</button><button type="button" data-label="' + escapeHtml(i.id) + '">Label</button><button type="button" data-history="' + escapeHtml(i.id) + '">History</button>';
     }
     function editRow(i) {
       const w = editing.what, id = escapeHtml(i.id);
@@ -223,6 +266,11 @@
           '<datalist id="area-list">' + U.inventoryAreas(items, typeOf(i)).map(a => '<option value="' + escapeHtml(a) + '">').join('') + '</datalist>' +
           '<label>Spot <input id="ed-spot" class="wide" maxlength="' + U.MAX_SPOT + '" aria-label="Spot" placeholder="Aisle, shelf or silo" value="' + escapeHtml(i.spot || '') + '"></label>' +
           '<button type="button" class="primary" id="ed-save">Save area</button>';
+      } else if (w === 'lists') {
+        // Joe 11-12-26: the plant's own lists this product is on, a comma between each (an existing one is offered as you type).
+        form = '<label>Lists <input id="ed-qty" class="wide" list="lists-list" maxlength="' + ((U.MAX_LIST + 2) * U.MAX_LISTS_PER_ITEM) + '" aria-label="Lists" placeholder="For example CAPS, LABELS" value="' + escapeHtml((i.lists || []).join(', ')) + '"></label>' +
+          '<datalist id="lists-list">' + U.inventoryLists(items).map(l => '<option value="' + escapeHtml(l.name) + '">').join('') + '</datalist>' +
+          '<button type="button" class="primary" id="ed-save">Save lists</button><small>A comma between lists. Leave it blank to take it off every list.</small>';
       } else if (w === 'count') {
         form = '<label>On the shelf now <input id="ed-qty" inputmode="numeric" maxlength="8" aria-label="What is on the shelf now"></label><button type="button" class="primary" id="ed-save">Save count</button>';
       } else {
@@ -238,11 +286,13 @@
       const a = document.activeElement;
       if (a && (a.id === 'ed-qty' || a.id === 'ed-for' || a.id === 'ed-spot') && editing) return;
       if (panel && document.getElementById('oh-panel').contains(a) && a.tagName !== 'BUTTON') return;
-      const milk = ohType === 'milk', ck = canCount(), sec = section(), bySupplier = ohType === 'supplies' || ohType === 'maint';
-      document.getElementById('oh-kind').hidden = sec.kinds.length < 2;
+      const milk = ohType === 'milk' && !ohList, ck = canCount(), sec = section(), bySupplier = ohList || ohType === 'supplies' || ohType === 'maint';
+      document.getElementById('oh-kind').hidden = sec.kinds.length < 2 || !!ohList;
+      const listBtn = document.getElementById('oh-list');
+      listBtn.hidden = !ohList; listBtn.textContent = ohList ? 'List: ' + ohList + ' · Show all' : '';
       document.getElementById('oh-supplier').hidden = !bySupplier;
       document.getElementById('milk-add').hidden = !milk || !ck;
-      document.getElementById('item-add').hidden = milk || !ck;
+      document.getElementById('item-add').hidden = milk || !ck || !!ohList;
       document.getElementById('oh-col2').textContent = milk ? 'Uses' : 'Supplier';
       document.getElementById('oh-col5').textContent = milk ? 'Made' : 'Received';
       const lowBtn = document.getElementById('oh-low');
@@ -252,12 +302,12 @@
       document.getElementById('oh-kind').innerHTML = '<option value="">All kinds</option>' + kinds.map(k => '<option' + (k === ohKind ? ' selected' : '') + '>' + k + '</option>').join('');
       document.getElementById('oh-supplier').innerHTML = '<option value="">All suppliers</option>' + sups.map(r => '<option value="' + escapeHtml(r.routeId) + '"' + (r.routeId === ohSupplier ? ' selected' : '') + '>' + escapeHtml(r.name || r.run) + '</option>').join('');
       const q = ohSearch.toUpperCase();
-      const mine = (items || []).filter(i => typeOf(i) === ohType);
+      const mine = (items || []).filter(i => ohList ? U.onList(i, ohList) : typeOf(i) === ohType);
       const lowCount = mine.filter(U.inventoryLow).length;
       lowBtn.textContent = 'Low only' + (lowCount ? ' (' + lowCount + ')' : '');
       const list = mine.filter(i => (!ohKind || i.kind === ohKind) && (!bySupplier || !ohSupplier || i.supplierId === ohSupplier) && (!ohLow || U.inventoryLow(i)) && inArea(i, ohArea) &&
         (!q || [i.name, supplierName(i.supplierId), i.area, i.spot].join(' ').toUpperCase().indexOf(q) >= 0))
-        .sort((a, b) => (ohType !== 'supplies' ? 0 : supplierName(a.supplierId).localeCompare(supplierName(b.supplierId))) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+        .sort((a, b) => (ohType !== 'supplies' && !ohList ? 0 : supplierName(a.supplierId).localeCompare(supplierName(b.supplierId))) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
       document.getElementById('oh-sheet').hidden = !!panel;
       document.getElementById('oh-panel').hidden = !panel;
       if (panel) { renderPanel(); }
@@ -271,8 +321,8 @@
           '<td class="num">' + (Number(inQty) ? (inQty > 0 ? '+' : '−') + num(Math.abs(inQty)) : '0') + '</td><td class="num">' + (Number(i.usedSince) ? (i.usedSince > 0 ? '−' : '+') + num(Math.abs(i.usedSince)) : '0') + '</td>' +
           '<td class="num strong big">' + num(U.shouldHave(i)) + '</td><td class="num">' + lowCell + '</td><td><div class="inv-acts">' + rowActs(i, ck) + '</div></td></tr>';
       }).join('') || '<tr><td colspan="9" class="empty">' + (!items ? 'Loading Inventory&hellip;' : mine.length ? 'No products match.' :
-        milk ? 'No milk products yet. Press Bring in our milk products to add every product on the Products list.' : 'Nothing in ' + escapeHtml(sec.name) + ' yet. Press Add product, or add it on Receiving &gt; Suppliers &amp; Products.') + '</td></tr>';
-      document.getElementById('oh-foot').textContent = sec.name + ': ' + list.length + ' product' + (list.length === 1 ? '' : 's') + (lowCount ? ' · ' + lowCount + ' low (red)' : '') + '. Should have is the last count, plus what was ' + (milk ? 'made' : 'received') + ' since, minus what was taken out.';
+        ohList ? 'Nothing on ' + escapeHtml(ohList) + ' yet. Press Show all, then Lists on a product.' : milk ? 'No milk products yet. Press Bring in our milk products to add every product on the Products list.' : 'Nothing in ' + escapeHtml(sec.name) + ' yet. Press Add product, or add it on Receiving &gt; Suppliers &amp; Products.') + '</td></tr>';
+      document.getElementById('oh-foot').textContent = (ohList || (ohKind ? sec.name + ', ' + (KIND_NAMES[ohKind] || ohKind) : sec.name)) + ': ' + list.length + ' product' + (list.length === 1 ? '' : 's') + (lowCount ? ' · ' + lowCount + ' low (red)' : '') + '. Should have is the last count, plus what was ' + (milk ? 'made' : 'received') + ' since, minus what was taken out.';
       const box = document.getElementById('ed-qty');
       if (box && !box.dataset.focused) { box.dataset.focused = '1'; box.focus(); }
     }
@@ -281,6 +331,7 @@
     async function saveEdit() {
       const box = document.getElementById('ed-qty'), t = box.value.replace(/,/g, '').trim(), w = editing.what;
       if (w === 'place') return savePlace(box.value.trim(), document.getElementById('ed-spot').value.trim());
+      if (w === 'lists') return saveLists(box.value);
       if (w === 'low' ? !/^[0-9]{0,7}$/.test(t) : !/^[0-9]{1,7}$/.test(t)) return ohError(w === 'use' ? 'Type how many were used, as a whole number.' : w === 'low' ? 'Type the low mark as a whole number, or leave it blank.' : 'Type what is on the shelf now, as a whole number.');
       if (w === 'use' && Number(t) < 1) return ohError('Type how many were used, as a whole number.');
       const btn = document.getElementById('ed-save'), label = btn.textContent;
@@ -293,6 +344,15 @@
       const btn = document.getElementById('ed-save');
       btn.disabled = true;
       try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'setPlace', itemId: editing.id, area, spot }); ohError(''); editing = null; render(); }
+      catch (e) { btn.disabled = false; ohError('Not saved (' + (e.message || e) + ').'); }
+    }
+    async function saveLists(typed) {
+      const lists = String(typed || '').split(',').map(U.listName).filter(Boolean);
+      if (lists.some(n => n.length >= U.MAX_LIST)) return ohError('Keep each list name under ' + U.MAX_LIST + ' letters.');
+      if (lists.length > U.MAX_LISTS_PER_ITEM) return ohError('A product can be on up to ' + U.MAX_LISTS_PER_ITEM + ' lists.');
+      const btn = document.getElementById('ed-save');
+      btn.disabled = true;
+      try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'setLists', itemId: editing.id, lists }); ohError(''); editing = null; render(); }
       catch (e) { btn.disabled = false; ohError('Not saved (' + (e.message || e) + ').'); }
     }
     async function addMilk() {
@@ -456,7 +516,10 @@
       if (!it) { beep(false); return unknownCode(raw); }
       beep(true);
       const t = typeOf(it);
-      if (t !== ohType) { ohType = t; ohKind = ohSupplier = ''; ohArea = ''; keepType(); }
+      if (tab === 'lists') tab = 'onhand';
+      if (ohList && !U.onList(it, ohList)) ohList = '';
+      if (t !== ohType && !ohList) { ohType = t; ohKind = ohSupplier = ''; ohArea = ''; }
+      keepType();
       if (tab === 'walk') {
         if (!inArea(it, wArea)) wArea = '';
         render();
@@ -534,7 +597,7 @@
         Object.keys(groups).sort().map(g => '<h3>' + escapeHtml(g) + '</h3><table class="issues inv-log"><thead><tr><th>Product</th><th>Inventory</th><th class="num">Should have</th><th class="num">Low at</th></tr></thead><tbody>' +
           groups[g].sort((a, b) => String(a.name).localeCompare(String(b.name))).map(i => '<tr><td class="strong">' + escapeHtml(i.name) + '</td><td>' + escapeHtml(section(typeOf(i)).name) + '</td><td class="num">' + num(U.shouldHave(i)) + ' ' + escapeHtml(unitWord(i)) + '</td><td class="num">' + num(i.low) + '</td></tr>').join('') +
           '</tbody></table>').join('') + '</div>';
-      pop('Low stock', html, [['Show low only', () => { if (!low.some(i => typeOf(i) === ohType)) { ohType = typeOf(low[0]); keepType(); } ohLow = true; ohArea = ohKind = ohSupplier = ''; setTab('onhand'); }, 'primary'], ['Print', () => { window.print(); return false; }], ['Close']]);
+      pop('Low stock', html, [['Show low only', () => { if (!low.some(i => typeOf(i) === ohType)) { ohType = typeOf(low[0]); keepType(); } ohLow = true; ohArea = ohKind = ohSupplier = ohList = ''; setTab('onhand'); }, 'primary'], ['Print', () => { window.print(); return false; }], ['Close']]);
     }
 
     async function saveUses() {
@@ -586,9 +649,17 @@
     }
 
     function setTab(t) { tab = t; editing = null; panel = null; const u = new URL(location.href); u.searchParams.set('tab', t); if (t === 'history' && hProduct) u.searchParams.set('product', hProduct); else u.searchParams.delete('product'); history.replaceState(null, '', u); render(); }
-    function keepType() { const u = new URL(location.href); if (ohType !== 'supplies') u.searchParams.set('type', ohType); else u.searchParams.delete('type'); history.replaceState(null, '', u); }
-    function setType(t) { ohType = t; editing = null; panel = null; ohKind = ohSupplier = ohArea = wArea = ''; keepType(); ohError(''); render(); }
+    function keepType() {
+      const u = new URL(location.href);
+      if (ohType !== 'supplies') u.searchParams.set('type', ohType); else u.searchParams.delete('type');
+      if (ohList) u.searchParams.set('list', ohList); else u.searchParams.delete('list');
+      u.searchParams.set('tab', tab);
+      history.replaceState(null, '', u);
+    }
+    function setType(t) { ohType = t; ohList = ''; editing = null; panel = null; ohKind = ohSupplier = ohArea = wArea = ''; keepType(); ohError(''); render(); }
     document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
+    document.getElementById('lists-body').addEventListener('click', e => { const b = e.target.closest('[data-pick-type], [data-pick-list]'); if (b) pickList(b); });
+    document.getElementById('oh-list').addEventListener('click', () => { ohList = ''; editing = null; keepType(); render(); });
     document.getElementById('types').addEventListener('click', e => { const b = e.target.closest('[data-type]'); if (b) setType(b.dataset.type); });
     document.getElementById('periods').addEventListener('click', e => { const b = e.target.closest('[data-period]'); if (b && b.dataset.period !== period) { period = b.dataset.period; follow(); } });
     document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
@@ -614,7 +685,7 @@
       if (v) onScan(v);
     });
     // A scan with nothing being typed (the scanner types fast and ends with Enter) is caught anywhere on the page.
-    listenForScans({ onScan: (raw) => { if (popBox.hidden && (tab === 'onhand' || tab === 'walk')) onScan(raw); } });
+    listenForScans({ onScan: (raw) => { if (popBox.hidden && (tab === 'lists' || tab === 'onhand' || tab === 'walk')) onScan(raw); } });
     const wrows = document.getElementById('w-rows');
     wrows.addEventListener('input', e => {
       const id = e.target.dataset.walk;
@@ -646,7 +717,7 @@
       const b = e.target.closest('button');
       if (!b) return;
       const d = b.dataset;
-      if (d.use || d.count || d.low || d.place) { editing = { id: d.use || d.count || d.low || d.place, what: d.use ? 'use' : d.count ? 'count' : d.place ? 'place' : 'low' }; panel = null; ohError(''); render(); return; }
+      if (d.use || d.count || d.low || d.place || d.lists) { editing = { id: d.use || d.count || d.low || d.place || d.lists, what: d.use ? 'use' : d.count ? 'count' : d.place ? 'place' : d.lists ? 'lists' : 'low' }; panel = null; ohError(''); render(); return; }
       if (d.uses) { const it = items.find(i => i.id === d.uses); editing = null; panel = { id: d.uses, what: 'uses', rows: ((it && it.uses) || []).map(u => ({ itemId: u.itemId, qty: String(u.qty) })) }; ohError(''); render(); return; }
       if (d.label) { editing = null; panel = { id: d.label, what: 'label', count: '1', lot: '' }; ohError(''); render(); return; }
       if (d.history) { hProduct = d.history; setTab('history'); return; }
@@ -680,6 +751,7 @@
       if (!popBox.hidden) { unpop(); return true; }
       if (editing || panel) { editing = null; panel = null; render(); return true; }
       if (tab === 'history' && hProduct) { hProduct = ''; setTab('onhand'); return true; }
+      if (tab === 'onhand' && ohList) { ohList = ''; keepType(); setTab('lists'); return true; }
       if (search || supplier || ohSearch || ohKind || ohSupplier || ohLow || ohArea) { search = supplier = ohSearch = ohKind = ohSupplier = ohArea = ''; ohLow = false; ['search', 'oh-search'].forEach(id => { document.getElementById(id).value = ''; }); render(); return true; }
       return false;
     };

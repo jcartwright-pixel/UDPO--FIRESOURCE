@@ -31,6 +31,26 @@ exports.hub = onCall({ timeoutSeconds: 30 }, async (request) => {
 });
 
 /*
+ * The Hub's porter (Joe 11-10-26): one door for outside calls; the key never reaches a browser. src/porter.js says how.
+ * First service: HERE for the MapMaker (map pictures, address lookup, suggestions, find by name), 11-12-26.
+ */
+exports.porter = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+  const user = unitedDairyUser(request.auth);
+  if (!user) throw new HttpsError('permission-denied', 'Sign in with your United Dairy Google account');
+  const H = require('./src/hub'), P = require('./src/porter');
+  try {
+    return await P.porterCall(db, user.email, request.data || {}, (app) => H.mayUseApp(db, user.email, app));
+  } catch (error) {
+    if (error instanceof H.HubError || error instanceof P.PorterError) {
+      const code = { NOT_ALLOWED: 'permission-denied', BAD_REQUEST: 'invalid-argument', NO_KEY: 'failed-precondition', OUTSIDE: 'unavailable', NOT_FOUND_PLACE: 'failed-precondition' }[error.code];
+      throw new HttpsError(code || 'failed-precondition', error.message);
+    }
+    console.error('porter', error);
+    throw new HttpsError('internal', 'internal');
+  }
+});
+
+/*
  * The route customer list through the Hub (Joe 11-9-26): hubRouteMaster/<plant> and hubCustomers/<plant>, built from the
  * Customer List's records (read only) and read by every other app. src/routemaster.js says how.
  */
@@ -46,4 +66,36 @@ exports.hubRouteMasterOnWeek = onDocumentWritten({ document: 'routeWeekly/{week}
 // Every hour as well, in case a change reached the list some other way.
 exports.hubRouteMasterHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 }, async () => {
   console.log('hubRouteMaster', JSON.stringify(await require('./src/routemaster').rebuildAll(db)));
+});
+
+/*
+ * The shared cost rules (Joe 11-12-26): hubCostRules/current, read by Route Cost Analysis and the Route & Trip Estimator.
+ * src/costrules.js says how. Rebuilt when Route Cost's rates or rule set, a saved Hub rule set or a fuel quote changes, and
+ * every hour (the truck trips change all day).
+ */
+const costRebuild = () => require('./src/costrules').rebuild(db);
+exports.hubCostRulesOnRates = onDocumentWritten({ document: 'routeCostRates/current', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
+exports.hubCostRulesOnRules = onDocumentWritten({ document: 'routeCostRules/current', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
+exports.hubCostRulesOnHubRates = onDocumentWritten({ document: 'hubCostRates/current', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
+exports.hubCostRulesOnQuote = onDocumentWritten({ document: 'fuelQuotes/{id}', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
+exports.hubCostRulesHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 }, async () => {
+  console.log('hubCostRules', JSON.stringify(await costRebuild()));
+});
+
+/*
+ * The plants' own map points (MapMaker 11-12-26): hubPlants/<plant>, every plant. src/hubplants.js says how. Filled when Route &
+ * Trip's starting points change and every hour (a new plant on the customer list), never over a plant saved on Plant Setup.
+ */
+const plantFill = () => require('./src/hubplants').fill(db);
+exports.hubPlantsOnLocations = onDocumentWritten({ document: 'routeEstimator/locations', timeoutSeconds: 120, maxInstances: 1 }, plantFill);
+exports.hubPlantsHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  console.log('hubPlants', JSON.stringify(await plantFill()));
+});
+
+/*
+ * Missing street addresses and map points (Joe 11-12-26: "get the addresses and fill them in"): looked up through the porter's
+ * HERE key a share at a time every hour, kept in hubAddressFill and shown on the Hub's customer list. src/addressfill.js says how.
+ */
+exports.hubAddressFillHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 540, memory: '512MiB', maxInstances: 1 }, async () => {
+  console.log('hubAddressFill', JSON.stringify(await require('./src/addressfill').fill(db)));
 });

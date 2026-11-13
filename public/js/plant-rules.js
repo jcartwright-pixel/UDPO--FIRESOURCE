@@ -177,6 +177,27 @@
     { key: 'maint', name: 'Maintenance', kinds: ['Maintenance Part', 'Safety'], areas: ['Parts Room', 'Filters & Oils', 'Safety Gear', 'Shop'] }
   ];
   var MAX_AREA = 40, MAX_SPOT = 40, MAX_COUNT_WALK = 300;
+  // Joe 11-12-26 ("all on the same list, but be able to only view in the inventory what I want to see"): a product can be on
+  // any of the plant's own named lists (Caps, Labels, Boxes ...), kept on the product itself (lists), never a list of its own.
+  // A list exists while a product is on it. listName tidies one name; inventoryLists gives every list with its products.
+  var MAX_LIST = 30, MAX_LISTS_PER_ITEM = 8;
+  function listName(v) { return text(v).replace(/\s+/g, ' ').slice(0, MAX_LIST).trim(); }
+  function inventoryLists(items) {
+    var by = {}, out = [];
+    (items || []).forEach(function (i) {
+      (Array.isArray(i && i.lists) ? i.lists : []).forEach(function (n) {
+        n = listName(n); var k = n.toUpperCase();
+        if (!n) return;
+        if (!by[k]) { by[k] = { name: n, items: [] }; out.push(by[k]); }
+        if (by[k].items.indexOf(i) < 0) by[k].items.push(i);
+      });
+    });
+    return out.sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { numeric: true }); });
+  }
+  function onList(item, name) {
+    var k = listName(name).toUpperCase();
+    return !!k && (Array.isArray(item && item.lists) ? item.lists : []).some(function (n) { return listName(n).toUpperCase() === k; });
+  }
   function inventorySection(item) {
     var k = text(item && item.kind);
     for (var i = 0; i < INVENTORY_SECTIONS.length; i++) if (INVENTORY_SECTIONS[i].kinds.indexOf(k) >= 0) return INVENTORY_SECTIONS[i].key;
@@ -1796,6 +1817,7 @@
   return { caseCompare: caseCompare, pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, hourSpeeds: hourSpeeds, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, truckTimes: truckTimes, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, MAX_UNLOADING: MAX_UNLOADING, unloadingFull: unloadingFull, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     INVENTORY_KINDS: INVENTORY_KINDS, INVENTORY_UNITS: INVENTORY_UNITS, MILK_KIND: MILK_KIND, INVENTORY_SECTIONS: INVENTORY_SECTIONS, inventorySection: inventorySection, inventoryAreas: inventoryAreas,
+    MAX_LIST: MAX_LIST, MAX_LISTS_PER_ITEM: MAX_LISTS_PER_ITEM, listName: listName, inventoryLists: inventoryLists, onList: onList,
     MAX_AREA: MAX_AREA, MAX_SPOT: MAX_SPOT, MAX_COUNT_WALK: MAX_COUNT_WALK, MAX_USES: MAX_USES, isMilk: isMilk, madeByProduct: madeByProduct, MAX_LOAD_LINES: MAX_LOAD_LINES, loadLines: loadLines, shouldHave: shouldHave, inventoryLow: inventoryLow, supplierProducts: supplierProducts, wholeOrNull: wholeOrNull,
     leaveFirst: leaveFirst, inLoadingOrder: inLoadingOrder, scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, reportLoads: reportLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,

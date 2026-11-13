@@ -83,7 +83,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     }
     // Joe 11-4-26 (Inventory mock-up E): Inventory is open to everyone in the plant, a supervisor too.
     await sup.goto(HOSTING + '/inventory.html?testEmail=super.test@uniteddairy.com');
-    await sup.waitForSelector('#oh-rows');
+    // It opens on its Lists (Joe 11-12-26).
+    await sup.waitForSelector('#tab-lists:not([hidden])');
     await sup.waitForFunction(() => !document.getElementById('screen').hidden);
     assert.equal(!!(await sup.$('#uc-refused')), false, 'Inventory is not under construction');
     // Any other being-built screen still opens for everyone.
