@@ -37,11 +37,12 @@ test('the fill adds every plant, takes the address from Route & Trip and the map
   }));
   const f = fakeFetch((q) => (/Sampletown/.test(q) ? { lat: 39.9, lon: -79.7, label: '1 Made-Up St, Sampletown, PA 15401' } : null));
   const r = await L.fill(db, { fetchFn: f, now });
-  assert.deepEqual(r.added.sort(), ['fac_charleston', 'fac_fairmont', 'fac_lancaster', 'fac_martins_ferry', 'fac_sample_depot', 'fac_sample_valley', 'fac_uniontown']);
+  assert.deepEqual(r.added.sort(), ['fac_ashland', 'fac_beckley', 'fac_charleston', 'fac_fairmont', 'fac_lancaster', 'fac_martins_ferry', 'fac_paintsville', 'fac_portsmouth', 'fac_roanoke', 'fac_sample_depot', 'fac_sample_valley', 'fac_uniontown']);
   // Charleston, Lancaster and Fairmont have no Route & Trip address here, so United Dairy's own address is used (Joe 11-13-26).
   assert.equal(db.docs.hubPlants.fac_charleston.address, '508 Roane Street, Charleston, WV 25302');
   assert.equal(db.docs.hubPlants.fac_lancaster.address, '724 South Columbus Street, Lancaster, OH 43130');
   assert.equal(db.docs.hubPlants.fac_fairmont.address, '6 Garvin Dairy Road, Fairmont, WV 26554');
+  assert.equal(db.docs.hubPlants.fac_ashland.address, '4926 Roberts Drive, Ashland, KY 41102');
   assert.equal(db.docs.hubPlants.fac_sample_depot.address, '2 Made-Up Rd, Othertown, OH', 'a Route & Trip starting point that is not a plant is kept, for the DC check');
   const u = db.docs.hubPlants.fac_uniontown;
   assert.equal(u.name, 'Uniontown');
@@ -49,11 +50,11 @@ test('the fill adds every plant, takes the address from Route & Trip and the map
   assert.deepEqual([u.lat, u.lon, u.active, u.source], [39.9, -79.7, true, 'auto']);
   // A plant with no address is kept with its name, so its customers still show; an administrator adds the address.
   assert.deepEqual([db.docs.hubPlants.fac_sample_valley.name, db.docs.hubPlants.fac_sample_valley.lat], ['Sample Valley', null]);
-  assert.equal(f.seen.length, 5, 'only addresses are looked up');
+  assert.equal(f.seen.length, 10, 'only addresses are looked up');
   // Nothing changed: nothing is written or looked up again.
   const again = await L.fill(db, { fetchFn: f, now });
   assert.equal(again.added.length + again.filled.length, 0);
-  assert.equal(f.seen.length, 9, 'only a place not found is asked again');
+  assert.equal(f.seen.length, 19, 'only a place not found is asked again');
 });
 
 test('a plant an administrator saved is never changed by the fill', async () => {

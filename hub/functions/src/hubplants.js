@@ -26,7 +26,13 @@ const ROUTE_TRIP_DEFAULT = [
 const UNITED_DAIRY_PLACES = [
   { name: 'United Dairy Charleston', address: '508 Roane Street, Charleston, WV 25302' },
   { name: 'United Dairy Lancaster', address: '724 South Columbus Street, Lancaster, OH 43130' },
-  { name: 'United Dairy Fairmont', address: '6 Garvin Dairy Road, Fairmont, WV 26554' }
+  { name: 'United Dairy Fairmont', address: '6 Garvin Dairy Road, Fairmont, WV 26554' },
+  // Joe 11-13-26: "Yes, if you can find all those. Ashland was Modern Foods." The other five DCs on the same page.
+  { name: 'United Dairy Portsmouth', address: '21154 State Route 72, West Portsmouth, OH 45663' },
+  { name: 'United Dairy Beckley', address: '511 Industrial Park Road, Beaver, WV 25813' },
+  { name: 'United Dairy Roanoke', address: '1814 Hollins Road NE, Roanoke, VA 24012' },
+  { name: 'United Dairy Ashland', address: '4926 Roberts Drive, Ashland, KY 41102' },
+  { name: 'United Dairy Paintsville', address: '727 Jefferson Avenue, Paintsville, KY 41240' }
 ];
 
 class PlantError extends Error { constructor(code, message) { super(message); this.code = code; } }
