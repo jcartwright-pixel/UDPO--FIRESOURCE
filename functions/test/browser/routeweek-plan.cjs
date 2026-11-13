@@ -77,9 +77,15 @@ async function openPage(browser, width, height, url) {
     assert.equal(await p.$eval(cell(1, 'wed'), b => b.classList.contains('over')), true);
     assert.equal(await p.textContent(cell(1, 'thu')), 'OFF');
     await p.waitForFunction(() => document.getElementById('reason').value === 'Thanksgiving', null, { timeout: 8000 });
+    // The moves save one after another; wait for the last one to land.
+    const want = { plan_0: { thu: false, sat: true }, plan_1: { thu: false, wed: true }, plan_2: { thu: false, sun: true } };
     let saved = null;
-    for (let k = 0; k < 40; k++) { const s = await d.collection('weekPlans').doc(PLANNED).get(); saved = s.exists ? s.data() : null; if (saved && saved.overrideReason && Object.keys(saved.days || {}).length === 3) break; await new Promise(r => setTimeout(r, 250)); }
-    assert.deepEqual(saved.days, { plan_0: { thu: false, sat: true }, plan_1: { thu: false, wed: true }, plan_2: { thu: false, sun: true } });
+    for (let k = 0; k < 60; k++) {
+      const s = await d.collection('weekPlans').doc(PLANNED).get(); saved = s.exists ? s.data() : null;
+      if (saved && saved.overrideReason && JSON.stringify(saved.days) === JSON.stringify(want)) break;
+      await new Promise(r => setTimeout(r, 250));
+    }
+    assert.deepEqual(saved.days, want);
     assert.equal(saved.overrideReason, 'Thanksgiving');
     results.push('Use Suggested Moves moved the 3 Thanksgiving loads to Sat, Wed and Sun, saved in the week\'s plan with the reason');
 
