@@ -346,16 +346,19 @@ After the week's days are set, `Move Stops for This Week` works out where each c
    - **3 deliveries down to 2**, or **2 down to 1**, only when the customer's week is under those numbers.
    - **Never put more on one delivery** than the last number. A delivery that would go over keeps its own day.
 3. Pick the routes in **Routes in my plan**. Tick each route to include; only ticked routes are shown, used and printed.
-4. Read the grid. Each line is one customer on its own route: Chain, Account, Customer, Route, then Sunday to Saturday.
+4. Read the grid. It shows every customer at first. Each line is one customer on its own route: Chain, Account, Customer, Route, **Normal** (the days it normally gets), then Sunday to Saturday.
+   - Each route's line says how many **stops it has each day** this week, counting every customer that route delivers, and how many of them were moved in. Check it so no route is overloaded.
+   - A customer that does not get its normal days this week says **CHANGED** in gold by its normal days.
    - A day shows **the route that delivers** that day (point at it to see the cases). Green is its normal day; gold is a delivery moved in.
    - A crossed-out day is a normal delivery taken off. **NONE** means no delivery this week.
    - A striped day is a day the customer's route does not run this week.
-5. To change a customer, click any of its days. Pick the route and day for each normal delivery, or `No delivery`, then press `Done`.
-6. Type a note in **Notes** if you want. Beside it is why it changed and the last 3 weeks of cases (point at it to read it all).
-7. Press `Save` to keep your changes and notes for later, or `Use These Changes` to make them this week's plan. Then press `Print`.
+5. To move a delivery to another day, click the **empty day** you want. The customer's delivery nearest that day moves there on its own route (a store on Friday clicked on Tuesday goes to Tuesday).
+6. To send it to another route, a day its route does not run, or no delivery, click a day that shows a route. Pick the route and day for each normal delivery (any day of the week), or `No delivery`, then press `Done`. Picking its normal day puts it back.
+7. Type a note in **Notes** if you want. Beside it is why it changed and the last 3 weeks of cases (point at it to read it all).
+8. Press `Save` to keep your changes and notes for later, or `Use These Changes` to make them this week's plan. Then press `Print`. The printout has every customer on the routes in your plan, each route with its stops a day, and the changed ones marked CHANGED.
 
 - A stop on a day its route does not run goes to the nearest day the route runs (the day before first). When the customer needs fewer deliveries, it rides on a delivery it already gets, and its cases go with it, so nobody is shorted.
-- `Changed` shows only the customers that change; `All Customers` shows them all. `Find a customer` narrows the list.
+- `All Customers` shows them all; `Changed` shows only the customers that change. `Find a customer` narrows the list.
 - `Start Over` asks first, then clears every route and day picked by hand, the notes and the route ticks. Anything already saved stays until you press `Save` or `Use These Changes` again.
 - Only this week changes. The Customer List and Route Master stay as they are, and the drivers' Route Book does not show these changes yet: hand out the printout.
 

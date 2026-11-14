@@ -91,12 +91,12 @@
           <div class="rw-stops-routes-list" id="stops-routes" hidden></div>
         </div>
         <div class="tabs" role="tablist" id="stops-tabs">
-          <button type="button" role="tab" data-stops="changes" aria-selected="true">Changed</button>
-          <button type="button" role="tab" data-stops="all" aria-selected="false">All Customers</button>
+          <button type="button" role="tab" data-stops="all" aria-selected="true">All Customers</button>
+          <button type="button" role="tab" data-stops="changes" aria-selected="false">Changed</button>
         </div>
         <input type="search" id="stops-find" placeholder="Find a customer" aria-label="Find a customer">
       </div>
-      <div class="rw-stops-key"><span class="on">855</span> route that delivers <span class="add">852</span> moved in <span class="drop">THU</span> normal day taken off <span class="no">&nbsp;</span> route not running <span class="none">NONE</span> no delivery this week · Click a day to change that customer</div>
+      <div class="rw-stops-key"><span class="on">855</span> route that delivers <span class="add">852</span> moved in <span class="drop">THU</span> normal day taken off <span class="no">&nbsp;</span> route not running <span class="none">NONE</span> no delivery this week <span class="chg">CHANGED</span> not its normal days · Click an empty day to move a delivery there, or a route to change it</div>
       <div class="rw-stops-list" id="stops-list"></div>
       <div class="modal-actions rw-stops-actions">
         <span class="rw-stops-state" id="stops-state"></span>
@@ -370,7 +370,7 @@
     // changes. picks: a route and day picked by hand for one normal delivery (route|account|day). notes: Joe's note per customer
     // on its own route (route|account). ticked: the routes in the plan (null: every route). All kept by Save until Start Over.
     const HS = window.UDHolidayStops;
-    let stopsData = null, stopsWeek = '', picks = {}, notes = {}, ticked = null, stopsShow = 'changes', stopsBusy = false, custOpen = '', savedSig = '', usedSig = '', savedAt = '';
+    let stopsData = null, stopsWeek = '', picks = {}, notes = {}, ticked = null, stopsShow = 'all', stopsBusy = false, custOpen = '', savedSig = '', usedSig = '', savedAt = '';
     const sKey = (route, account, day) => route + '|' + account + '|' + day;
     const cKey = (route, account) => route + '|' + account;
     const DAY3 = (p) => NAME(p).slice(0, 3);
@@ -421,6 +421,8 @@
         cell[to.route].cases = Math.round((cell[to.route].cases + cases) * 10) / 10;
         if (to.route !== s.route || to.day !== s.day) cell[to.route].moved = true;
       });
+      // Joe 11-14-26 ("if that customer normally got a Thursday ... I need to know that it was changed").
+      Object.keys(by).forEach(k => { const r = by[k]; r.changed = r.changes.some(c => c.toRoute !== c.route || c.toDay !== c.fromDay); });
       return Object.keys(by).map(k => by[k]).sort((a, b) => byRoute(a.route, b.route) || String(a.chain).localeCompare(String(b.chain)) || String(a.account).localeCompare(String(b.account), undefined, { numeric: true }) || String(a.customer).localeCompare(String(b.customer)));
     }
     // One day cell: the route that delivers that day (Joe: "I need to know that customer gets delivered this day with this route"), the cases under it.
@@ -429,7 +431,26 @@
       let inner = '';
       if (cell) inner = Object.keys(cell).sort(byRoute).map(r => '<span class="' + (cell[r].moved ? 'add' : 'on') + '" title="' + escapeHtml(String(cell[r].cases)) + ' cases">' + escapeHtml(r) + '</span>').join('');
       else if (row.normal[p]) inner = none ? '<span class="none">None</span>' : '<span class="drop">' + DAY3(p) + '</span>';
-      return '<td class="d no-fit' + (run ? '' : ' no') + '"><button type="button" data-cust="' + escapeHtml(row.key) + '" data-day="' + p + '"' + (edit ? '' : ' disabled') + ' aria-label="' + escapeHtml(row.customer + ' ' + NAME(p)) + '">' + inner + '</button></td>';
+      const title = inner ? '' : ' title="' + escapeHtml('Move a delivery to ' + NAME(p)) + '"';
+      return '<td class="d no-fit' + (run ? '' : ' no') + '"><button type="button" data-cust="' + escapeHtml(row.key) + '" data-day="' + p + '"' + (inner ? '' : ' data-empty') + title + (edit ? '' : ' disabled') + ' aria-label="' + escapeHtml(row.customer + ' ' + NAME(p)) + '">' + inner + '</button></td>';
+    }
+    // The normal days (Joe 11-14-26): CHANGED in gold when this week is not the customer's normal days.
+    const normalDays = (row) => L.DAYS.filter(p => row.normal[p]).map(DAY3).join(' ');
+    function normalCell(row) {
+      return '<td class="c-norm no-fit" title="' + escapeHtml('Normally ' + normalDays(row) + (row.changed ? ', changed this week' : '')) + '">' + (row.changed ? '<span class="chg">Changed</span> ' : '') + escapeHtml(normalDays(row)) + '</td>';
+    }
+    // Stops on each route each day this week, every customer counted on the route that delivers it (Joe 11-14-26: "I want to
+    // see how many stops, that route has not to overload it"); moved in: the ones that are not that route's own normal stops.
+    function stopCounts(rows) {
+      const n = {};
+      rows.forEach(r => L.DAYS.forEach(p => { const c = r.cells[p]; if (!c) return; Object.keys(c).forEach(x => {
+        const t = (n[x] = n[x] || {})[p] = n[x][p] || { all: 0, in: 0 }; t.all++; if (c[x].moved && !(x === r.route && r.normal[p])) t.in++; }); }));
+      return n;
+    }
+    function countText(route, on, counts) {
+      const c = counts[route] || {};
+      const days = L.DAYS.filter(p => (on[route] && on[route][p]) || (c[p] && c[p].all));
+      return days.length ? 'Stops ' + days.map(p => DAY3(p) + ' ' + (c[p] ? c[p].all : 0) + (c[p] && c[p].in ? ' (' + c[p].in + ' moved in)' : '')).join(' · ') : 'No stops';
     }
     function renderRoutePick(changes) {
       const all = [...new Set(stopsData.stops.map(s => s.route))].sort(byRoute), n = {};
@@ -451,28 +472,29 @@
       document.querySelectorAll('[data-stops]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.stops === stopsShow)));
       const rows = customerRows(all).filter(r => inPlan(r.route) && (stopsShow === 'all' || r.changes.length || notes[r.key]) &&
         (!find || (r.chain + ' ' + r.account + ' ' + r.customer + ' ' + r.route).toUpperCase().indexOf(find) >= 0));
-      const hol = holiday(), head = '<thead><tr><th class="c-chain">Chain</th><th class="c-acct">Account</th><th class="c-cust">Customer</th><th class="c-route">Route</th>' +
+      const hol = holiday(), head = '<thead><tr><th class="c-chain">Chain</th><th class="c-acct">Account</th><th class="c-cust">Customer</th><th class="c-route">Route</th><th class="c-norm">Normal</th>' +
         L.DAYS.map(p => '<th class="d' + (hol && hol.p === p ? ' hol' : '') + '">' + DAY3(p) + '<small>' + shortDate(L.addDays(week, L.DAYS.indexOf(p))).replace(/-\d{2}$/, '') + '</small></th>').join('') + '<th class="c-note">Notes</th></tr></thead>';
       let prior = '', body = '';
+      const everyone = customerRows(all), counts = stopCounts(everyone);
       rows.slice(0, 1500).forEach(r => {
         if (r.route !== prior) {
           prior = r.route;
           const runs = L.DAYS.filter(p => on[r.route] && on[r.route][p]).map(DAY3).join(' ') || 'no day';
           const list = rows.filter(x => x.route === r.route);
-          body += '<tr class="rt"><td colspan="12" class="no-fit">Route ' + escapeHtml(r.route) + ' · runs ' + runs + ' this week · ' + list.length + ' customer' + (list.length === 1 ? '' : 's') + ' shown · ' + list.filter(x => x.changes.length).length + ' changed</td></tr>';
+          body += '<tr class="rt"><td colspan="13" class="no-fit">Route ' + escapeHtml(r.route) + ' · runs ' + runs + ' this week · ' + escapeHtml(countText(r.route, on, counts)) + ' · ' + list.length + ' customer' + (list.length === 1 ? '' : 's') + ' shown · ' + list.filter(x => x.changed).length + ' changed</td></tr>';
         }
         const why = [...new Set(r.changes.map(c => (KIND[c.kind] || '') + (c.why && c.why !== KIND[c.kind] ? ': ' + c.why : '')))].join(' · ');
-        body += '<tr data-cust="' + escapeHtml(r.key) + '" class="' + (r.changes.length ? 'changed' : '') + '"><td class="no-fit" title="' + escapeHtml(r.chain) + '">' + escapeHtml(r.chain) + '</td><td class="no-fit">' + escapeHtml(r.account) + '</td><td class="no-fit" title="' + escapeHtml(r.customer) + '">' + escapeHtml(r.customer) + '</td><td class="strong no-fit">' + escapeHtml(r.route) + '</td>' +
+        body += '<tr data-cust="' + escapeHtml(r.key) + '" class="' + (r.changed ? 'changed' : '') + '"><td class="no-fit" title="' + escapeHtml(r.chain) + '">' + escapeHtml(r.chain) + '</td><td class="no-fit">' + escapeHtml(r.account) + '</td><td class="no-fit" title="' + escapeHtml(r.customer) + '">' + escapeHtml(r.customer) + '</td><td class="strong no-fit">' + escapeHtml(r.route) + '</td>' + normalCell(r) +
           L.DAYS.map(p => dayCell(r, p, on, edit)).join('') +
           '<td class="note"><input type="text" maxlength="300" data-note="' + escapeHtml(r.key) + '" value="' + escapeHtml(notes[r.key] || '') + '" placeholder="Type a note"' + (edit ? '' : ' disabled') + ' aria-label="Note for ' + escapeHtml(r.customer) + '">' +
           '<small title="' + escapeHtml((why ? why + ' · ' : '') + 'Last 3 weeks ' + r.weeks.join(', ')) + '">' + (why ? '<b>' + escapeHtml(why) + '</b> · ' : '') + 'Last 3 weeks ' + r.weeks.join(', ') + '</small></td></tr>';
       });
-      document.getElementById('stops-list').innerHTML = '<table class="rw-stops-table rw-stops-grid">' + head + '<tbody>' + (body || '<tr><td colspan="12" class="empty">' +
+      document.getElementById('stops-list').innerHTML = '<table class="rw-stops-table rw-stops-grid">' + head + '<tbody>' + (body || '<tr><td colspan="13" class="empty">' +
         (!stopsData.hub ? 'The Hub has no route customer list for this plant yet.' : stopsShow === 'all' ? 'No customers match.' : 'No changes on the routes in the plan: every customer is delivered on its normal days.') + '</td></tr>') + '</tbody></table>';
       document.getElementById('stops-use').disabled = !edit || stopsBusy || !stopsData.hub || used;
       document.getElementById('stops-save').disabled = !edit || stopsBusy || !stopsData.hub || savedSig === sig;
       document.getElementById('stops-over').disabled = !edit || (!Object.keys(picks).length && !Object.keys(notes).length && !ticked);
-      document.getElementById('stops-print').disabled = !plan.length;
+      document.getElementById('stops-print').disabled = !stopsData.hub;
       if (custOpen) renderCustomer();
     }
     // One customer's pop-up: each normal delivery goes to any route and day (Joe: "Ability to change it to a different route in a different day").
@@ -485,7 +507,7 @@
       document.getElementById('stops-cust-body').innerHTML = '<table class="rw-stops-table"><thead><tr><th>Normal Day</th><th>Cases</th><th>Goes To Route</th><th>Day</th></tr></thead><tbody>' + stops.map(s => {
         const k = sKey(s.route, s.account, s.day), c = all.find(x => sKey(x.route, x.account, x.fromDay) === k), toR = c ? c.toRoute : s.route, toD = c ? c.toDay : s.day;
         const rOpts = '<option value="">No delivery</option>' + routesOn.concat(toR && routesOn.indexOf(toR) < 0 ? [toR] : []).map(r => '<option value="' + escapeHtml(r) + '"' + (r === toR ? ' selected' : '') + '>' + escapeHtml(r) + '</option>').join('');
-        const dOpts = toR ? L.DAYS.filter(p => (on[toR] && on[toR][p]) || p === toD).map(p => '<option value="' + p + '"' + (p === toD ? ' selected' : '') + '>' + dayText(p) + (on[toR] && on[toR][p] ? '' : ' (not running)') + '</option>').join('') : '';
+        const dOpts = toR ? L.DAYS.map(p => '<option value="' + p + '"' + (p === toD ? ' selected' : '') + '>' + dayText(p) + (on[toR] && on[toR][p] ? '' : ' (not running)') + '</option>').join('') : '';
         return '<tr data-k="' + escapeHtml(k) + '"><td>' + dayText(s.day) + '</td><td>' + HS.average(s.weeks) + '</td><td><select data-pick="route" aria-label="Route"' + (edit ? '' : ' disabled') + '>' + rOpts + '</select></td><td>' +
           (toR ? '<select data-pick="day" aria-label="Day"' + (edit ? '' : ' disabled') + '>' + dOpts + '</select>' : '') + '</td></tr>';
       }).join('') + '</tbody></table>';
@@ -537,7 +559,28 @@
       else { ticked = ticked || new Set(all); if (box.checked) ticked.add(box.dataset.route); else ticked.delete(box.dataset.route); if (ticked.size === all.length) ticked = null; }
       renderStops();
     });
-    document.getElementById('stops-list').addEventListener('click', (e) => { const b = e.target.closest('button[data-cust]'); if (b && !b.disabled) openCustomer(b.dataset.cust); });
+    document.getElementById('stops-list').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-cust]');
+      if (!b || b.disabled) return;
+      if (b.hasAttribute('data-empty') && moveInto(b.dataset.cust, b.dataset.day)) return;
+      openCustomer(b.dataset.cust);
+    });
+    // Joe 11-14-26 ("a store running on Friday. Well, I'd like to change it to a Tuesday"): a click on an empty day moves the
+    // customer's delivery nearest that day there, on its own route. When its route does not run that day the pop-up opens instead.
+    function moveInto(key, p) {
+      const [route, account] = key.split('|'), on = weekRuns(), all = stopChanges(false);
+      if (!(on[route] && on[route][p])) return false;
+      const gap = (a) => Math.abs(L.DAYS.indexOf(a) - L.DAYS.indexOf(p));
+      const stops = stopsData.stops.filter(s => s.route === route && s.account === account).map(s => {
+        const c = all.find(x => sKey(x.route, x.account, x.fromDay) === sKey(s.route, s.account, s.day));
+        return { s, toDay: c ? c.toDay : s.day };
+      });
+      if (!stops.length) return false;
+      const going = stops.filter(x => x.toDay), pick = (going.length ? going : stops).sort((a, b) => gap(a.toDay || a.s.day) - gap(b.toDay || b.s.day) || gap(a.s.day) - gap(b.s.day))[0];
+      picks[sKey(pick.s.route, pick.s.account, pick.s.day)] = { toRoute: route, toDay: p, why: 'Picked by hand' };
+      renderStops();
+      return true;
+    }
     document.getElementById('stops-list').addEventListener('input', (e) => {
       const i = e.target.closest('input[data-note]');
       if (!i) return;
@@ -599,16 +642,18 @@
     document.getElementById('stops-ask-no').onclick = () => ask(false);
     document.getElementById('stops-ask-back').onclick = () => ask(false);
     document.getElementById('stops-ask-yes').onclick = () => { picks = {}; notes = {}; ticked = null; ask(false); renderStops(); };
-    // Print: the customers that change on the routes in the plan, the same grid, on the page itself (one window).
+    // Print: every customer on the routes in the plan with each route's stops a day, the same grid, on the page itself (one window).
     document.getElementById('stops-print').onclick = () => {
       const all = stopChanges(false), plan = all.filter(c => inPlan(c.route)), rd = reasonDoc(), on = weekRuns();
-      const rows = customerRows(all).filter(r => inPlan(r.route) && (r.changes.length || notes[r.key]));
+      // Joe 11-14-26: every customer, not only the changes ("I want to see everything here because I want to see how many stops").
+      const everyone = customerRows(all), counts = stopCounts(everyone), rows = everyone.filter(r => inPlan(r.route));
       const cell = (r, p) => { const c = r.cells[p]; if (c) return Object.keys(c).sort(byRoute).map(x => '<b>' + escapeHtml(x) + '</b> ' + escapeHtml(String(c[x].cases))).join('<br>');
         return r.normal[p] ? '<s>' + DAY3(p) + '</s>' : ''; };
       document.getElementById('stops-printout').innerHTML = '<h1>Stop Changes · Week of ' + escapeHtml(shortDate(week)) + '</h1><p>' + escapeHtml(rd && rd.overrideReason || '') +
-        (usedSig === listSig(plan) ? '' : ' · Not used yet') + ' · ' + plan.length + ' changes · Each day: the route that delivers, then cases (last 3 weeks average) · Crossed out: normal day taken off</p>' +
-        '<table><thead><tr><th>Route</th><th>Chain</th><th>Account</th><th>Customer</th>' + L.DAYS.map(p => '<th>' + DAY3(p) + '</th>').join('') + '<th>Notes</th></tr></thead><tbody>' +
-        rows.map(r => '<tr><td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.chain) + '</td><td>' + escapeHtml(r.account) + '</td><td>' + escapeHtml(r.customer) + '</td>' +
+        (usedSig === listSig(plan) ? '' : ' · Not used yet') + ' · ' + rows.length + ' customers · ' + plan.length + ' changes · Each day: the route that delivers, then cases (last 3 weeks average) · Crossed out: normal day taken off · CHANGED: not its normal days</p>' +
+        '<table><thead><tr><th>Route</th><th>Chain</th><th>Account</th><th>Customer</th><th>Normal</th>' + L.DAYS.map(p => '<th>' + DAY3(p) + '</th>').join('') + '<th>Notes</th></tr></thead><tbody>' +
+        rows.map((r, i) => (i && rows[i - 1].route === r.route ? '' : '<tr class="rt"><td colspan="13"><b>Route ' + escapeHtml(r.route) + '</b> · ' + escapeHtml(countText(r.route, on, counts)) + '</td></tr>') +
+          '<tr' + (r.changed ? ' class="changed"' : '') + '><td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.chain) + '</td><td>' + escapeHtml(r.account) + '</td><td>' + escapeHtml(r.customer) + '</td><td>' + (r.changed ? '<b>CHANGED</b><br>' : '') + escapeHtml(normalDays(r)) + '</td>' +
           L.DAYS.map(p => '<td class="' + (on[r.route] && on[r.route][p] ? '' : 'no') + '">' + cell(r, p) + '</td>').join('') +
           '<td>' + escapeHtml(notes[r.key] || '') + (r.changes.length ? '<br><small>' + escapeHtml([...new Set(r.changes.map(c => KIND[c.kind] || ''))].join(', ')) + '</small>' : '') + '</td></tr>').join('') + '</tbody></table>';
       document.body.classList.add('printing-stops');

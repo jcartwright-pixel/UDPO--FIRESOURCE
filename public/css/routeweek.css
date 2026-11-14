@@ -166,3 +166,12 @@
 .routeweek-page table.rw-stops-grid tbody tr td { white-space: nowrap; overflow-wrap: normal; }
 .routeweek-page table.rw-stops-grid th.c-chain { width: 10%; } .routeweek-page table.rw-stops-grid th.c-acct { width: 7%; } .routeweek-page table.rw-stops-grid th.c-cust { width: 15%; } .routeweek-page table.rw-stops-grid th.c-note { width: 30.8%; }
 #stops-list table.rw-stops-grid tbody tr td { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+/* Joe 11-14-26: the Normal column (CHANGED in gold when this week is not the customer's normal days) and stops a day per route. */
+.routeweek-page table.rw-stops-grid th.c-norm { width: 8%; } .routeweek-page table.rw-stops-grid th.c-note { width: 22.8%; }
+.routeweek-page .rw-stops-grid td.c-norm { font-weight: 700; color: var(--ud-blue-dark); }
+.routeweek-page .rw-stops-grid .chg, .routeweek-page .rw-stops-key .chg { display: inline-block; min-width: 0; padding: 0 5px; border-radius: 6px; background: #f2b632; color: #3d2a00; font-weight: 800; }
+.routeweek-page .rw-stops-grid tr.changed td.c-norm { box-shadow: inset 4px 0 0 #f2b632; }
+@media print {
+  .rw-stops-printout tr.rt td { background: #e8eef4; border-top: 2px solid #000; }
+  .rw-stops-printout tr.changed td { background: #fff6dc; }
+}
