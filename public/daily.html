@@ -47,6 +47,8 @@
     <!-- Joe 11/6: this screen always shows the current week; the week cannot be changed here, only the day inside it. -->
     <div class="day-info" id="day-info">
       <div class="week-of"><small>Week of</small><span id="week-of"></span></div>
+      <!-- Joe 11-13-26 ("Yes, I want everything done"): the coming holiday week, as planned on Holiday Week Override, read only. -->
+      <a class="button hol-plan" id="hol-plan" hidden></a>
       <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
       <div id="send-texts" hidden></div>
       <div class="day-pick">
@@ -143,9 +145,14 @@
     const testNow = testServer && Date.parse(params.get('now') || '');
     let testToday = testNow ? L.operatingDay(new Date(Date.parse(params.get('now')))) : '';
     const today = () => testToday || L.operatingDay(new Date());
-    let liveCurrent = '', started = false;
+    let liveCurrent = '', liveNext = '', started = false;
+    // Joe 11-13-26: ?plan=<Sunday> shows a coming holiday week read only: the runs as Holiday Week Override planned them (built from
+    // Route Master with the week's plan until Publish builds the week), so the holiday schedule can be looked at before it is live.
+    const planWeek = (() => { const w = params.get('plan'); return L.isDateKey(w) && L.weekStart(w) === w ? w : ''; })();
+    const mayEdit = () => !planWeek && canSave(), mayOrder = () => !planWeek && canReorder();
+    let planDoc = null, routeDocs = [], unsubscribePlanDoc = null;
     // The loadout Saturday that starts the week shown, and a day pulled inside that week.
-    const lockBegin = () => testServer && !testNow ? weekBegin(testToday || loadDate) : L.isDateKey(liveCurrent) ? L.addDays(liveCurrent, -1) : weekBegin(today());
+    const lockBegin = () => planWeek ? L.addDays(planWeek, -1) : testServer && !testNow ? weekBegin(testToday || loadDate) : L.isDateKey(liveCurrent) ? L.addDays(liveCurrent, -1) : weekBegin(today());
     const intoWeek = (key) => { const b = lockBegin(), e = L.addDays(b, 6); return key < b ? b : key > e ? e : key; };
     let unsubscribeRuns = null, unsubscribePlant = null, unsubscribeCarrier = null, plantLoads = [], routeLoads = [], carrierLoads = [], runs = [], rows = [], editing = false, rowDrag = null, held = false, writeBack = false, editRow = null;
     const getRuns = () => runs;
@@ -270,9 +277,10 @@
       if (editing) return; // a picker is open; the next render happens when it closes
       if (rowDrag && rowDrag.busy()) { held = true; return; } // a load is being moved; the screen redraws when it is let go
       rows = buildRows();
-      const edit = canSave(), order = canReorder();
-      document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN OPERATIONS');
+      const edit = mayEdit(), order = mayOrder();
+      document.getElementById('mode-text').textContent = planWeek ? 'HOLIDAY PLAN, READ ONLY' + (planDoc && planDoc.overrideReason ? ': ' + planDoc.overrideReason.toUpperCase() : '') : modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN OPERATIONS');
       ['open-down', 'open-calloff', 'open-add'].forEach(id => { document.getElementById(id).disabled = !edit; });
+      planButton();
       const body = [];
       let group = '', loaded = '', subs = 0;
       const mixed = mixedLoads(rows);
@@ -394,7 +402,7 @@
       const tr = e.target.closest('tr[data-index]');
       if (!tr || editing) return;
       const row = rows[Number(tr.dataset.index)];
-      if (e.target.closest('[data-runs]')) { if (canSave()) setRuns(row, !!row.off); return; }
+      if (e.target.closest('[data-runs]')) { if (mayEdit()) setRuns(row, !!row.off); return; }
       if (e.target.closest('[data-ovr]')) { ovr[row.id] = e.target.checked; return; }
       if (e.target.closest('[data-open]')) { openEdit(row); return; }
       const td = e.target.closest('td[data-edit]');
@@ -443,7 +451,7 @@
     // Current app: a double-click on a row (not on a cell that edits, a box or a button) flips RUNS / NO RUN.
     body.addEventListener('dblclick', e => {
       const tr = e.target.closest('tr[data-index]');
-      if (!tr || editing || !canSave() || e.target.closest('td[data-edit], input, button, select, textarea')) return;
+      if (!tr || editing || !mayEdit() || e.target.closest('td[data-edit], input, button, select, textarea')) return;
       try { window.getSelection().removeAllRanges(); } catch (ignore) { /* nothing selected */ }
       const row = rows[Number(tr.dataset.index)];
       setRuns(row, !!row.off);
@@ -455,7 +463,7 @@
     // cell; the row being moved is shaded and a blue line shows where it lands. Alt+Up / Alt+Down move the selected line.
     // Review item 75 (Joe 10/13): the shared js/row-drag.js does the dragging (each line's data-drag is its place in rows,
     // data-drag-group its load day); a redraw waits until the line is let go.
-    rowDrag = mountRowDrag({ box: body, canDrag: () => !editing && canReorder(), keysInside: true, onMove: (id, to) => {
+    rowDrag = mountRowDrag({ box: body, canDrag: () => !editing && mayOrder(), keysInside: true, onMove: (id, to) => {
       const moving = rows[Number(id)], ordered = rows.filter(r => !r.off && !r.already && r.loadDate === moving.loadDate);
       const from = ordered.indexOf(moving);
       if (from < 0 || to < 0 || to >= ordered.length || to === from) return;
@@ -570,7 +578,7 @@
     function paintAddWhere() {
       const r = addable[Number(document.getElementById('add-pick').value)], box = document.getElementById('add-where-box');
       const day = r && document.getElementById('add-pick').value !== '' ? rows.filter(x => !x.off && !x.already && x.loadDate === loadDate) : [];
-      box.hidden = !canReorder() || !day.length;
+      box.hidden = !mayOrder() || !day.length;
       document.getElementById('add-where').innerHTML = '<option value="">At the end</option><option value="first">First, before Route ' + escapeHtml(day.length ? day[0].route : '') + '</option>' +
         day.map(x => '<option value="' + escapeHtml(x.id) + '">After Route ' + escapeHtml(fullName(x)) + '</option>').join('');
     }
@@ -694,17 +702,17 @@
       const begin = weekBegin(loadDate);
       document.getElementById('week-of').textContent = shortDate(L.addDays(begin, 1)) + ' to ' + shortDate(L.addDays(begin, 7));
       // The arrows stop at the ends of the week; greyed, they say why.
-      const atStart = loadDate === begin, atEnd = loadDate === L.addDays(begin, 6), why = 'Daily Dispatch shows only this week';
+      const atStart = loadDate === begin, atEnd = loadDate === L.addDays(begin, 6), why = planWeek ? 'The holiday plan shows only its own week' : 'Daily Dispatch shows only this week';
       Object.entries({ prev: atStart, next: atEnd }).forEach(([id, stop]) => { const b = document.getElementById(id); b.disabled = stop; b.title = stop ? why : ''; });
       document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
         const key = L.addDays(begin, i);
         return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key)) + '</option>';
       }).join('');
       document.getElementById('go-weekly').href = 'weekly.html?view=live' + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
-      history.replaceState(null, '', '?date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
+      history.replaceState(null, '', '?' + (planWeek ? 'plan=' + planWeek + '&' : '') + 'date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
       // Joe 10/17: the day on screen is the day kept, however he got here (his own pick, or Weekly's Daily Dispatch tile), so going
       // back and forth never drops him on today. Print Layouts' hidden copy does not change it.
-      try { if (dayKey && window.self === window.top) localStorage.setItem(dayKey, loadDate); } catch (e) { /* storage off */ }
+      try { if (dayKey && window.self === window.top && !planWeek) localStorage.setItem(dayKey, loadDate); } catch (e) { /* storage off */ }
       // One live query: every open screen gets each change the moment it is saved, without checking every 30 seconds.
       const weeks = [...new Set(L.weeksForLoadDate(loadDate).concat(isSaturday(loadDate) ? L.weeksForLoadDate(L.addDays(loadDate, 1)) : []))];
       const q = query(collection(db, 'runs'), where('weekStart', 'in', weeks));
@@ -719,11 +727,36 @@
           .map(e => ({ runId: e.runId, route: e.route, run: e.run, date: e.date, pickupTime: e.pickupTime, loadDate: e.loadDate, trailer: e.trailer, poNumber: e.poNumber, carrier: true }));
         plantLoads = routeLoads.concat(carrierLoads); render();
       }, () => { carrierLoads = []; plantLoads = routeLoads; render(); });
+      if (planWeek && liveNext && planWeek > liveNext) {
+        // Not built yet: Route Master with the week's Holiday Week Override plan (weekPlans), as Weekly Dispatch shows it.
+        if (unsubscribePlanDoc) unsubscribePlanDoc();
+        unsubscribePlanDoc = onSnapshot(doc(db, 'weekPlans', planWeek), snap => { planDoc = snap.exists() ? snap.data() : null; runs = plannedRuns(); runsRead = true; render(); }, () => { planDoc = null; runs = plannedRuns(); runsRead = true; render(); });
+        unsubscribeRuns = () => { if (unsubscribePlanDoc) unsubscribePlanDoc(); unsubscribePlanDoc = null; };
+        return;
+      }
+      if (planWeek) { if (unsubscribePlanDoc) unsubscribePlanDoc(); unsubscribePlanDoc = onSnapshot(doc(db, 'weeks', planWeek), snap => { planDoc = snap.exists() ? snap.data() : null; render(); }, () => {}); }
       unsubscribeRuns = onSnapshot(q, snap => {
         runs = withUnsaved(snap.docs.map(d => Object.assign({ id: d.id }, d.data())));
         runsRead = true;
         render();
       }, e => showError('Could not read the dispatch: ' + e.message));
+    }
+
+    // The planned week's runs, built as Publish will build them (drivers, trucks and trailers from the masters).
+    function plannedRuns() {
+      if (!routeDocs.length) return [];
+      const ctx = L.weekBuildContext(lists.allDrivers, lists.exceptions, lists.fleetTrucks.concat(lists.fleetTrailers), routeDocs, routeLoads);
+      return routeDocs.filter(r => r.id && (r.route || r.routeId)).map(r => Object.assign(L.buildWeekRun(L.plannedRoute(r, planDoc), planWeek, ctx), { id: planWeek + '__' + r.id, rev: 0 }));
+    }
+    // The button to the coming holiday week (and back): shown while that week is after this one.
+    function planButton() {
+      const b = document.getElementById('hol-plan'), test = params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '';
+      if (planWeek) { b.hidden = false; b.textContent = 'Back to This Week'; b.href = 'daily.html' + (test ? '?' + test.slice(1) : ''); return; }
+      let nh = null;
+      for (let i = 0; i < 400 && !nh; i++) { const key = L.addDays(today(), i), name = R.holidayName(key); if (name) nh = { key, name }; }
+      const w = nh ? L.weekStart(nh.key) : '';
+      b.hidden = !w || !L.isDateKey(liveCurrent) || w <= liveCurrent;
+      if (!b.hidden) { b.textContent = nh.name + ' Plan'; b.title = 'The ' + nh.name + ' week as planned on Holiday Week Override (read only)'; b.href = 'daily.html?plan=' + w + test; }
     }
 
     // Joe 10/12: the day picked stays picked (per person, on this computer) after leaving the page and coming back, until he
@@ -741,6 +774,8 @@
       sendTextsStrip(db, document.getElementById('send-texts'), { short: true });
       onSnapshot(collection(db, 'routes'), snap => {
         routeHours = {}; routeSleeper = {};
+        routeDocs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        if (planWeek && liveNext && planWeek > liveNext) { runs = plannedRuns(); render(); }
         snap.docs.forEach(d => { const r = d.data(), h = {}; L.DAYS.forEach(p => { h[p] = r.days && r.days[p] && r.days[p].hours; }); routeHours[d.id] = h; if (L.yes(r.sleeper)) routeSleeper[d.id] = true; });
       }, () => {});
       onSnapshot(doc(db, 'config', 'app'), snap => {
@@ -750,6 +785,8 @@
         document.getElementById('to-conflicts').hidden = !writeBack;
         // A Publish moves the week on: the screen follows it to today, kept inside the newly published week.
         const cur = (c.liveWeeks || {}).current;
+        const nx = (c.liveWeeks || {}).next || '';
+        if (nx !== liveNext) { liveNext = nx; if (planWeek && started) { watchRuns(); return; } }
         if (L.isDateKey(cur) && cur !== liveCurrent) {
           liveCurrent = cur;
           if (started && !inFrame && weekBegin(loadDate) !== lockBegin()) { loadDate = intoWeek(today()); watchRuns(); return; }
@@ -760,7 +797,7 @@
         const at = when ? new Date(when) : null;
         document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + window.UDTiming.clockOf(at) : 'Waiting for the first copy from the sheets';
       });
-      watchLists(user, render);
+      watchLists(user, () => { if (planWeek && liveNext && planWeek > liveNext) runs = plannedRuns(); render(); });
       document.getElementById('prev').onclick = () => move(-1);
       document.getElementById('next').onclick = () => move(1);
       document.getElementById('load-day').onchange = e => goTo(e.target.value);
@@ -770,8 +807,10 @@
       const linked = L.isDateKey(params.get('date'));
       if (!linked && L.isDateKey(kept)) loadDate = kept;
       if (testServer && !testToday) testToday = loadDate;
-      const first = await getDoc(doc(db, 'config', 'app')).then(s => ((s.data() || {}).liveWeeks || {}).current || '', () => '');
+      const lw = await getDoc(doc(db, 'config', 'app')).then(s => (s.data() || {}).liveWeeks || {}, () => ({}));
+      const first = lw.current || '';
       if (L.isDateKey(first)) liveCurrent = first;
+      liveNext = lw.next || '';
       if (!inFrame && weekBegin(loadDate) !== lockBegin()) loadDate = linked && L.isDateKey(kept) && weekBegin(kept) === lockBegin() ? kept : intoWeek(today());
       started = true;
       // Only with no published week to go by (a new copy of the app) does the calendar move the week (Saturday 6 a.m.).

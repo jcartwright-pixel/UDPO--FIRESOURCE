@@ -145,6 +145,13 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 - The arrows stop at the ends of the week (they turn gray).
 - The day you pick stays picked on this computer while it is in the published week, even when you go to the Weekly Dispatch Template and back.
 
+### See the coming holiday week
+
+- When a holiday's week is coming (for example Thanksgiving), a gold button beside **Week of** says its name, like `Thanksgiving Plan`. It opens that week's days as planned on [Holiday Week Override](#routeweek), with the drivers, trucks and trailers the week will be built with.
+- The holiday plan is **read only**: the top says HOLIDAY PLAN, READ ONLY. Change it on Holiday Week Override. `Back to This Week` returns to the published week.
+
+!> Do not look for the plan's changes in the published week. They come in only when the holiday week is published.
+
 !> Do not wait past Friday to publish next week. Saturday's loadout is the first day of the next week, so it shows here only after that week is published.
 
 > To see or plan another week, use `Weekly Dispatch` or the Weekly Dispatch Template.
