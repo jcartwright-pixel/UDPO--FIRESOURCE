@@ -82,7 +82,6 @@
         <label>No delivery this week when the last 3 weeks average under<span><input type="number" min="0" max="9999" step="1" data-rule="skipUnder"> cases a week</span></label>
         <label>3 deliveries down to 2 when the week is under<span><input type="number" min="0" max="9999" step="1" data-rule="cutTo2Under"> cases</span></label>
         <label>2 deliveries down to 1 when the week is under<span><input type="number" min="0" max="9999" step="1" data-rule="cutTo1Under"> cases</span></label>
-        <label>Never put more on one delivery than<span><input type="number" min="0" max="9999" step="1" data-rule="maxPerDelivery"> cases</span></label>
       </div>
       <div class="rw-stops-bar">
         <!-- Joe 11-13-26 (mock-up lm): "a drop down with a tick if I want to include that route. In my plan." -->
@@ -532,6 +531,8 @@
         const w = week, data = await callServer('save', { holidayStops: true, weekStart: w });
         if (w !== week) return;
         stopsData = data;
+        // Joe 11-14-26: no cap on one delivery ("That can be disabled because I don't need that").
+        stopsData.rules = HS.rules(Object.assign({}, data.rules, { maxPerDelivery: 0 }));
         const saved = data.saved || null, start = saved && (saved.draft || (saved.changes && saved.changes.length ? saved : null));
         if (start) {
           startFrom(start.changes, data);

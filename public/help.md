@@ -341,10 +341,9 @@ The screen knows the holidays. The `Next holiday` button (for example "Next holi
 After the week's days are set, `Move Stops for This Week` works out where each customer's deliveries go that week. It lists every change before anything is used.
 
 1. Set which days each route runs (above), then press `Move Stops for This Week`.
-2. Check the four case limits at the top. They are cases a week, the average of the last 3 weekly route reports (a week with no sale counts as 0). Each box saves when you change it; 0 turns that rule off.
+2. Check the three case limits at the top. They are cases a week, the average of the last 3 weekly route reports (a week with no sale counts as 0). Each box saves when you change it; 0 turns that rule off.
    - **No delivery this week** when the customer's last 3 weeks average under the first number (a Dairy Queen closed for the season, a store that stopped buying).
    - **3 deliveries down to 2**, or **2 down to 1**, only when the customer's week is under those numbers.
-   - **Never put more on one delivery** than the last number. A delivery that would go over keeps its own day.
 3. Pick the routes in **Routes in my plan**. Tick each route to include; only ticked routes are shown, used and printed.
 4. Read the grid. It shows every customer at first. Each line is one customer on its own route: Chain, Account, Customer, Route, **Normal** (the days it normally gets), then Sunday to Saturday.
    - Each route's line says how many **stops it has each day** this week, counting every customer that route delivers, and how many of them were moved in. Check it so no route is overloaded.

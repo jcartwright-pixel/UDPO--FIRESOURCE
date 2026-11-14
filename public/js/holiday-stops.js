@@ -27,7 +27,7 @@
   const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   const WEEKS = 3;
   // Starting numbers, until Joe sets his own on Holiday Stop Rules (cases a week, average of the last 3 weeks).
-  const DEFAULT_RULES = Object.freeze({ skipUnder: 3, cutTo2Under: 60, cutTo1Under: 30, maxPerDelivery: 80 });
+  const DEFAULT_RULES = Object.freeze({ skipUnder: 3, cutTo2Under: 60, cutTo1Under: 30, maxPerDelivery: 0 }); // Joe 11-14-26: no cap on one delivery ("That can be disabled because I don't need that")
   const RULE_KEYS = Object.keys(DEFAULT_RULES);
 
   const num = (v) => { const n = Number(v); return isFinite(n) && n > 0 ? n : 0; };

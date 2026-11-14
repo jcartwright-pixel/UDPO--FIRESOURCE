@@ -67,7 +67,7 @@
 .routeweek-page .rw-stops-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .routeweek-page .rw-stops-top h2 { margin: 0; }
 .routeweek-page .rw-stops-top button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
-.routeweek-page .rw-stops-rules { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.routeweek-page .rw-stops-rules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .routeweek-page .rw-stops-rules label { background: #f4f8fb; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; letter-spacing: 0; }
 .routeweek-page .rw-stops-rules label span { display: flex; align-items: center; gap: 6px; color: var(--ud-blue); font-weight: 800; }
 .routeweek-page .rw-stops-rules input { width: 90px; font-weight: 800; color: var(--ud-blue); }
