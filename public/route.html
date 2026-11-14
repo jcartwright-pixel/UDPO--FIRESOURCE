@@ -622,7 +622,7 @@
     $('dv-truck-items').innerHTML = TRUCK_ITEMS.map(pick).join('');
     addSpeak(form);
     form.querySelector('[data-trailer="1"] .dv-items').innerHTML = TRAILER_ITEMS.map(pick).join('');
-    let dvRequest = '', reviewed = false, dvLoads = [], dvOdometers = {}, inked = false, saved = false;
+    let dvRequest = '', reviewed = false, dvLoads = [], dvOdometers = {}, dvPick = { pre: 0, post: 0 }, dvTouched = false, inked = false, saved = false;
     const sigKey = 'udRoute.signature';
     function extraBox(n) {
       const d = document.createElement('div');
@@ -666,7 +666,13 @@
       form.querySelector('[data-trailer="1"] .dv-trailer').value = (t[0] || '').toUpperCase();
       $('dv-extra').innerHTML = ''; t.slice(1, 4).forEach(x => addTrailer(x.toUpperCase())); renumber();
     }
-    $('dv-route').addEventListener('change', fillRoute);
+    $('dv-route').addEventListener('change', () => { dvTouched = true; fillRoute(); });
+    // A post-trip starts on the run that left last, a pre-trip on the next one to leave, until the driver picks a route.
+    $('dv-inspection').addEventListener('change', () => {
+      const i = $('dv-inspection').value === 'Post-trip' ? dvPick.post : dvPick.pre;
+      if (dvTouched || !dvLoads[i] || $('dv-route').value === String(i)) return;
+      $('dv-route').value = String(i); fillRoute();
+    });
     $('dv-odometer').addEventListener('input', () => { $('dv-odo-note').textContent = ''; });
     // Joe 10/13: the odometer follows whatever truck is entered, from Verizon (the loads answer carries every truck's reading).
     // A number the driver typed is never replaced.
@@ -681,12 +687,13 @@
       step('step-dvir'); form.reset(); $('dv-odometer').dataset.gps = ''; $('dv-odo-note').textContent = ''; $('dv-extra').innerHTML = ''; renumber(); saved = false; reviewed = false; $('dv-send').textContent = 'Review inspection'; $('dv-msg').textContent = '';
       [...form.elements].forEach(el => { el.disabled = false; });
       dvRequest = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9-]/g, '');
-      const r = await call('loads', { driverId, date: dates[0] || '' });
-      dvLoads = r.loads; dvOdometers = r.gpsOdometers || {};
-      $('dv-route').innerHTML = '<option value="">Select route…</option>' + dvLoads.map((l, i) => '<option value="' + i + '">' + escapeHtml(window.UDLogic.routeNumber(l.route) + ' · ' + l.run) + '</option>').join('');
-      if (dvLoads.length) { $('dv-route').value = '0'; fillRoute(); }
+      // Joe 11-14-26: the runs by when they leave, not by the 6 AM day change (Tuesday's 1:30 AM run is here on Monday night).
+      const r = await call('loads', { driverId, dvir: true });
+      dvLoads = r.loads; dvOdometers = r.gpsOdometers || {}; dvPick = r.pick || { pre: 0, post: 0 }; dvTouched = false;
+      $('dv-route').innerHTML = '<option value="">Select route…</option>' + dvLoads.map((l, i) => '<option value="' + i + '">' + escapeHtml(window.UDLogic.routeNumber(l.route) + ' · ' + l.run + (l.leaves ? ' · leaves ' + l.leaves : '')) + '</option>').join('');
+      if (dvLoads.length) { $('dv-route').value = String(dvPick.pre || 0); fillRoute(); }
       $('dv-route-box').hidden = dvLoads.length === 1;
-      if (!dvLoads.length) $('dv-msg').textContent = 'Dispatch has no route for you today, so there is nothing to inspect yet.';
+      if (!dvLoads.length) $('dv-msg').textContent = 'Dispatch has no route for you from yesterday, today or leaving in the next 12 hours, so there is nothing to inspect yet.';
       $('dv-name').value = driverName;
       clearCanvas(false);
       if (!room) try { const s = JSON.parse(localStorage.getItem(sigKey) || 'null'); if (s && s.driver === driverName && s.image) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); inked = true; sigStatus('Saved signature'); }; img.src = s.image; } } catch (e) {}
