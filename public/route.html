@@ -753,7 +753,10 @@
       const defects = truckChecks.concat(t1).concat(...extras.map(valuesOf)).filter(v => v === 'Defect found').length;
       if (!reviewed && !direct) {
         reviewed = true; $('dv-send').textContent = 'Submit inspection';
-        return bad('Review: ' + l.route + ' · ' + l.run + ' · ' + $('dv-inspection').value + ' · Truck ' + $('dv-truck').value.trim() + ' · Trailer ' + (trailers.join(', ') || '—') + ' · ' + defects + ' defect' + (defects === 1 ? '' : 's') + '. Confirm your entries above, then submit.');
+        // Joe 11-14-26 ("what if the driver leaves early? There's got to be another fail-safe"): the review names the day and time
+        // the route leaves, and says so when the inspection is on another route than the one it would start on.
+        const want = dvLoads[$('dv-inspection').value === 'Post-trip' ? dvPick.post : dvPick.pre], other = want && want !== l ? ' CHECK THE ROUTE: ' + $('dv-inspection').value + ' is usually for ' + want.route + ' · ' + want.run + (want.leaves ? ' (leaves ' + want.leaves + ')' : '') + '.' : '';
+        return bad('Review: ' + l.route + ' · ' + l.run + (l.leaves ? ' · leaves ' + l.leaves : '') + ' · ' + $('dv-inspection').value + ' · Truck ' + $('dv-truck').value.trim() + ' · Trailer ' + (trailers.join(', ') || '—') + ' · ' + defects + ' defect' + (defects === 1 ? '' : 's') + '.' + other + ' Confirm your entries above, then submit.');
       }
       const fields = { inspection: $('dv-inspection').value, odometer: $('dv-odometer').value.trim(), truck: $('dv-truck').value.trim(), trailer: first.querySelector('.dv-trailer').value.trim(),
         checks: truckChecks.concat(t1), moreTrailers: extras.map(d => ({ trailer: d.querySelector('.dv-trailer').value.trim(), checks: valuesOf(d), issues: d.querySelector('.dv-issues').value.trim() })),
