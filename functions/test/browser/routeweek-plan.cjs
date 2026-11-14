@@ -111,13 +111,13 @@ async function openPage(browser, width, height, url) {
     // Joe 11-13-26 ("Yes, I want everything done"): Daily Dispatch shows the holiday week as planned, read only.
     await p.goto(HOSTING + '/daily.html?plan=' + PLANNED + '&date=2026-11-25&testEmail=manager.test@uniteddairy.com');
     await p.waitForFunction(() => document.getElementById('mode-text').textContent === 'HOLIDAY PLAN, READ ONLY: THANKSGIVING', null, { timeout: 15000 });
-    await p.waitForSelector('#rows tr[data-id="' + PLANNED + '__plan_1"]', { timeout: 15000 });
+    await p.waitForSelector('#rows tr[data-id^="' + PLANNED + '__plan_1|"]', { timeout: 15000 });
     assert.equal(await p.textContent('#hol-plan'), 'Back to This Week');
     assert.equal(await p.isDisabled('#open-add'), true, 'nothing can be changed on the plan');
     await p.selectOption('#load-day', '2026-11-26');
     await p.waitForFunction(() => document.getElementById('load-day').value === '2026-11-26');
     await p.waitForTimeout(500);
-    assert.equal(!!(await p.$('#rows tr[data-id="' + PLANNED + '__plan_1"]')), false, '857 moved off Thanksgiving');
+    assert.equal(!!(await p.$('#rows tr[data-id^="' + PLANNED + '__plan_1|"]')), false, '857 moved off Thanksgiving');
     results.push('Daily Dispatch shows the Thanksgiving plan read only: 857 on Wednesday, not on Thursday');
     assert.deepEqual(p.errors, []);
     assert.deepEqual(p.errors, []);
