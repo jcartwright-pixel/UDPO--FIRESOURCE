@@ -71,21 +71,47 @@ async function openPage(browser, width, height, url) {
     await p.click('#stops-open');
     await p.waitForSelector('#stops-list tr[data-cust]', { timeout: 15000 });
     // Each day cell: the route that delivers and its cases, or the normal day crossed out, or NONE.
-    const day = (cust, d) => p.$eval('#stops-list tr[data-cust="' + cust + '"]', (tr, i) => { const td = tr.cells[4 + i], sp = td.querySelector('span');
+    const day = (cust, d) => p.$eval('#stops-list tr[data-cust="' + cust + '"]', (tr, i) => { const td = tr.cells[5 + i], sp = td.querySelector('span');
       return sp ? sp.className + ':' + sp.textContent : (td.classList.contains('no') ? 'no' : ''); }, DAYS.indexOf(d));
-    assert.deepEqual(await p.$eval('#stops-list thead tr', tr => [...tr.cells].map(c => c.childNodes[0].textContent)), ['Chain', 'Account', 'Customer', 'Route', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Notes']);
+    assert.deepEqual(await p.$eval('#stops-list thead tr', tr => [...tr.cells].map(c => c.childNodes[0].textContent)), ['Chain', 'Account', 'Customer', 'Route', 'Normal', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Notes']);
     assert.deepEqual([await day('855|101', 'mon'), await day('855|101', 'wed'), await day('855|101', 'thu')], ['on:855', 'add:855', 'drop:Thu'],
       'Thursday off: the low-volume store rides on Wednesday on route 855 (3 down to 2)');
-    assert.equal(await p.$eval('#stops-list tr[data-cust="855|101"]', tr => tr.cells[8].classList.contains('no')), true, 'Thursday is striped: route 855 does not run');
+    assert.equal(await p.$eval('#stops-list tr[data-cust="855|101"]', tr => tr.cells[9].classList.contains('no')), true, 'Thursday is striped: route 855 does not run');
     assert.deepEqual([await day('855|102', 'mon')], ['none:None'], 'no cases in the last 3 weeks: no delivery');
     assert.deepEqual([await day('855|103', 'tue'), await day('855|103', 'wed')], ['on:855', 'add:855'], 'a busy store keeps 2 deliveries: Thursday moves to Wednesday');
+    // Joe 11-14-26: every customer shows at first, each route with its stops a day, and a changed customer says CHANGED by its normal days.
+    assert.equal(await p.$$eval('#stops-list tr[data-cust]', t => t.length), 4, 'All Customers shows every customer');
+    const norm = (cust) => p.$eval('#stops-list tr[data-cust="' + cust + '"] td.c-norm', td => td.textContent);
+    assert.deepEqual([await norm('855|101'), await norm('852|201')], ['Changed Mon Wed Thu', 'Fri']);
+    assert.match(await p.$eval('#stops-list tr.rt', tr => tr.textContent), /Route 852 · runs Mon Tue Wed Thu Fri Sat this week · Stops Mon 0 · Tue 0 · Wed 0 · Thu 0 · Fri 1 · Sat 0 ·/);
+    assert.match(await p.$$eval('#stops-list tr.rt', t => t[1].textContent), /Route 855 · runs Sun Mon Tue Wed this week · Stops Sun 0 · Mon 1 · Tue 1 · Wed 2 \(1 moved in\) ·/);
+    results.push('Every customer shows at first; each route says its stops a day (moved in counted); a changed customer says CHANGED by its normal days');
+    // Joe 11-14-26 ("a store running on Friday. Well, I'd like to change it to a Tuesday"): click the empty Tuesday.
+    await p.click('#stops-list tr[data-cust="852|201"] td:nth-child(8) button');
+    assert.deepEqual([await day('852|201', 'tue'), await day('852|201', 'fri'), await norm('852|201')], ['add:852', 'drop:Fri', 'Changed Fri']);
+    assert.match(await p.$eval('#stops-list tr.rt', tr => tr.textContent), /Stops Mon 0 · Tue 1 \(1 moved in\) · Wed 0 · Thu 0 · Fri 0 · Sat 0/);
+    // And back to Friday in its pop-up, where every day can be picked.
+    await p.click('#stops-list tr[data-cust="852|201"] td:nth-child(11) button');
+    await p.waitForSelector('#stops-cust:not([hidden])');
+    assert.equal(await p.$$eval('#stops-cust tr[data-k="852|201|fri"] select[data-pick=day] option', o => o.length), 7, 'any day can be picked');
+    await p.selectOption('#stops-cust tr[data-k="852|201|fri"] select[data-pick=day]', 'fri');
+    await p.click('#stops-cust-close');
+    assert.deepEqual([await day('852|201', 'tue'), await day('852|201', 'fri'), await norm('852|201')], ['', 'on:852', 'Fri']);
+    results.push('A click on an empty day moves the delivery there (Friday to Tuesday); the pop-up offers every day and puts it back');
+    // Print: every customer, each route with its stops a day.
+    await p.evaluate(() => { window.print = () => {}; });
+    await p.click('#stops-print');
+    assert.equal(await p.$$eval('#stops-printout tbody tr:not(.rt)', t => t.length), 4, 'the printout has every customer');
+    assert.match(await p.textContent('#stops-printout'), /Route 855 · Stops Sun 0 · Mon 1 · Tue 1 · Wed 2 \(1 moved in\)/);
+    results.push('Print has every customer, not only the changes, with each route\'s stops a day');
+    await p.click('#stops-tabs [data-stops="changes"]');
     assert.equal(await p.$$eval('#stops-list tr[data-cust]', t => t.length), 3, 'Changed shows the 3 customers that change');
     assert.match(await p.textContent('#stops-state'), /^4 changes in the plan · Not saved$/);
     results.push('Each customer on its own route, Sun to Sat: the route that delivers each day with its cases, a day taken off crossed out, NONE for no delivery');
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'routeweek-stops-1536.png') });
 
     // Any delivery to any route and day, by hand: click the day, pick in the customer's pop-up.
-    await p.click('#stops-list tr[data-cust="855|103"] td:nth-child(9) button');
+    await p.click('#stops-list tr[data-cust="855|103"] td:nth-child(10) button');
     await p.waitForSelector('#stops-cust:not([hidden])');
     await p.selectOption('#stops-cust tr[data-k="855|103|thu"] select[data-pick=route]', '852');
     await p.selectOption('#stops-cust tr[data-k="855|103|thu"] select[data-pick=day]', 'fri');
