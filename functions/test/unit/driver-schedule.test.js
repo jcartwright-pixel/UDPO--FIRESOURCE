@@ -55,3 +55,31 @@ test('the phone page has My Schedule with the employee number box', () => {
   assert.match(route, /id="m-schedule"[^>]*><b>My Schedule<\/b>/);
   assert.match(route, /<label for="emp-id">Your employee number<\/label>/);
 });
+
+// Joe 11-14-26 ("Says off Sunday, it leaves 1 p.m. ... it's the day before ... leaves Sunday 1 p.m."): a run that leaves the day
+// before it delivers names the day it leaves, so the text and My Schedule do not read as if he leaves on his day off.
+test('a run that leaves the day before names that day: Leaves Sun 1:00 PM', () => {
+  const week = '2026-11-15';
+  const driver = { id: 'drv_c', name: 'CEDAR, CAL', cells: {} };
+  const run = (route, leavesOn, days) => ({ id: week + '__' + route, weekStart: week, route, run: 'JERSEY', runId: 'run_' + route, masterShow: { leavesOn }, days });
+  const day = (o) => Object.assign({ runs: true, driverId: 'drv_c', driver: 'CEDAR, CAL', truck: '512' }, o);
+  const runs = [
+    // Monday's Jersey, Load Day, loaded Saturday (2 days before): leaves Sunday 1:00 PM.
+    run('852', 'Load Day', { mon: day({ dispatchTime: 780, loadDayOffset: -2, departureDate: '2026-11-16' }),
+      // Tuesday's, loaded Monday: leaves Monday 1:00 PM.
+      tue: day({ dispatchTime: 780, loadDayOffset: -1, departureDate: '2026-11-17' }),
+      // Load Day at 4:00 AM is the next morning, the delivery day itself: just the time.
+      wed: day({ dispatchTime: 240, loadDayOffset: -1, departureDate: '2026-11-18' }) }),
+    // Delivery Day: leaves on its own day.
+    run('901', 'Delivery Day', { thu: day({ dispatchTime: 420, loadDayOffset: -1, departureDate: '2026-11-19' }) }),
+    // No Departure Day on the run (copied before runs carried it): just the time, as before.
+    run('905', '', { fri: day({ dispatchTime: 780, loadDayOffset: -1 }) })
+  ];
+  const days = scheduleDays(driver, L.weeklyRows(runs, week), [], week);
+  assert.equal(days[1].runs[0].leaves, 'Sun 1:00 PM');
+  assert.equal(days[2].runs[0].leaves, 'Mon 1:00 PM');
+  assert.equal(days[3].runs[0].leaves, '4:00 AM');
+  assert.equal(days[4].runs[0].leaves, '7:00 AM');
+  assert.equal(days[5].runs[0].leaves, '1:00 PM');
+  // The schedule text puts it on the Leaves line as is ("Truck 512 · Leaves Sun 1:00 PM").
+});
