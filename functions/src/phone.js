@@ -113,6 +113,44 @@ async function dayLoads(db, date) {
 }
 const byRoute = (a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run), undefined, { numeric: true });
 
+// Joe 11-14-26 ("if a driver is running route 12 on Tuesday, and it leaves at 1:30 in the morning, it's not putting those
+// values in there ... it hasn't kicked over to the new day, which is 6 a.m."): the DVIR goes by when the run leaves, not by
+// the 6 AM day change. A pre-trip or post-trip may be made for yesterday's or today's runs, and for tomorrow's runs that leave
+// in the next DVIR_AHEAD_HOURS (Tuesday's 1:30 AM run on Monday's operating day; a Load Day run that leaves the day before
+// it delivers). When the run leaves is the one leaving rule (timing-rules.js departWall), on the plant's wall clock.
+const DVIR_AHEAD_HOURS = 12;
+const LEAVE_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function leavesWall(run, p, date) {
+  const d = (run.days && run.days[p]) || {}, t = T.clockMinutes(d.dispatchTime);
+  if (t === null) return null;
+  return T.departWall({ departureDate: d.departureDate || '', deliveryDate: date, loadDate: L.addDays(date, T.loadDayOffset(d.loadDayOffset)),
+    leavesOn: (run.masterShow && run.masterShow.leavesOn) || '', dispatchTime: t });
+}
+function leaveText(wall) { return wall === null ? '' : LEAVE_DAY[((Math.floor(wall / T.DAY) + 4) % 7 + 7) % 7] + ' ' + L.timeText(((wall % T.DAY) + T.DAY) % T.DAY); }
+function dvirDates(today) { return [today, L.addDays(today, -1), L.addDays(today, 1)]; }
+// Tomorrow's run is open for its DVIR only once it leaves within DVIR_AHEAD_HOURS; yesterday's and today's always.
+function dvirOpen(date, today, leaves, now) { return date !== L.addDays(today, 1) || (leaves !== null && leaves - now <= DVIR_AHEAD_HOURS * 60); }
+// Which run the DVIR starts on (the driver can still pick another): a pre-trip, the next run to leave (or one that left in the
+// last 3 hours, a pre-trip made a little late); a post-trip, the run that left last. Otherwise the run leaving nearest now.
+// loads: [{ leavesIn: minutes from now (negative = already left), or null }]. Returns { pre, post } indexes.
+function dvirPick(loads) {
+  const timed = loads.map((l, i) => ({ i, m: l.leavesIn })).filter(x => x.m !== null && x.m !== undefined && isFinite(x.m));
+  const near = timed.length ? timed.reduce((b, x) => (Math.abs(x.m) < Math.abs(b.m) ? x : b)).i : 0;
+  const next = timed.filter(x => x.m >= -180), last = timed.filter(x => x.m <= 0);
+  return { pre: next.length ? next.reduce((b, x) => (x.m < b.m ? x : b)).i : near, post: last.length ? last.reduce((b, x) => (x.m > b.m ? x : b)).i : near };
+}
+async function dvirLoads(db, who, stamp) {
+  const today = L.operatingDay(new Date(stamp)), now = T.wallClock(Date.parse(stamp)), out = [];
+  for (const date of [L.addDays(today, -1), today, L.addDays(today, 1)]) {
+    (await dayLoads(db, date)).filter(x => who.mine(x.run, x.id, x.p, x.d)).forEach(x => {
+      const leaves = leavesWall(x.run, x.p, date);
+      if (dvirOpen(date, today, leaves, now)) out.push(Object.assign(loadOf(x.run, x.id, x.p), { date, leaves: leaveText(leaves), leavesIn: leaves === null ? null : leaves - now }));
+    });
+  }
+  // In the order they leave (a run with no dispatch time last).
+  return out.sort((a, b) => (a.leavesIn === null) - (b.leavesIn === null) || (a.leavesIn || 0) - (b.leavesIn || 0) || byRoute(a, b));
+}
+
 // The unit lists the Check-In boxes offer (a short number finds the unit; any number is still taken).
 // Joe 10/5 (GPS spec) and 10/13 ("according to what truck is entered"): the DVIR odometer fills from GPS. Each load's truck
 // and every truck on the list get their latest Verizon Connect Fleet odometer (gpsTrucks, read every 5 minutes) when Fleet
@@ -193,7 +231,6 @@ const titleWord = (t) => String(t || '').toLowerCase().replace(/(^|[\s/-])([a-z]
 // Joe 11-14-26 ("Says off Sunday, it leaves 1 p.m. ... it's the day before ... it should say an abbreviation, leaves Sunday 1
 // p.m."): a run that leaves on another day than the day it delivers (a Monday Jersey that leaves Sunday 1:00 PM) names that day,
 // "Sun 1:00 PM", by the one leaving rule (timing-rules.js departWall). A run that leaves on its own day reads just the time.
-const LEAVE_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function leavesText(r, d, date) {
   if (d.dispatchTime === null || d.dispatchTime === undefined || d.dispatchTime === '' || !isFinite(Number(d.dispatchTime))) return '';
   const time = L.timeText(Number(d.dispatchTime));
@@ -290,12 +327,15 @@ async function phoneCall(db, input, now) {
   const dates = allowedDates(stamp);
   if (op === 'loads') {
     const date = dates.indexOf(input.date) >= 0 ? input.date : dates[0];
-    const loads = (await dayLoads(db, date)).filter(x => who.mine(x.run, x.id, x.p, x.d)).map(x => loadOf(x.run, x.id, x.p)).sort(byRoute);
+    // The DVIR (input.dvir): the runs by when they leave (dvirLoads), with the one to start on for a pre-trip and a post-trip.
+    const loads = input.dvir === true ? await dvirLoads(db, who, stamp) : (await dayLoads(db, date)).filter(x => who.mine(x.run, x.id, x.p, x.d)).map(x => loadOf(x.run, x.id, x.p)).sort(byRoute);
     const units = await unitLists(db), odometers = await gpsOdometers(db, loads, units.trucks, Date.parse(stamp) || Date.now());
     const label = who.kind === 'route' ? (loads[0] ? 'Route ' + L.routeNumber(loads[0].route) + ' · ' + loads[0].run : 'Your route') : who.kind === 'skip' ? 'Driver not chosen' : who.name;
-    return { date, dates, driver: label, loads, units, gpsOdometers: Object.fromEntries(Object.entries(odometers).map(([k, v]) => [k, v.miles])) };
+    const out = { date, dates, driver: label, loads, units, gpsOdometers: Object.fromEntries(Object.entries(odometers).map(([k, v]) => [k, v.miles])) };
+    if (input.dvir === true) out.pick = dvirPick(loads);
+    return out;
   }
-  if (op === 'dvir') return saveDvir(db, input, who, dates, stamp);
+  if (op === 'dvir') return saveDvir(db, input, who, stamp);
   if (op !== 'checkIn') throw new SaveError('BAD_REQUEST', 'Unknown request');
   const req = A.validate(Object.assign({}, input.fields || {}, { action: 'saveCheckIn', requestId: input.requestId, runDocId: input.runDocId, day: input.day }));
   return db.runTransaction(async tx => {
@@ -389,7 +429,8 @@ function validateDvir(input) {
   return out;
 }
 
-async function saveDvir(db, input, who, dates, stamp) {
+async function saveDvir(db, input, who, stamp) {
+  const today = L.operatingDay(new Date(stamp)), dates = dvirDates(today), now = T.wallClock(Date.parse(stamp));
   const req = validateDvir(input), by = 'phone:' + who.by, driver = { id: who.id, name: who.name || req.signatureName };
   const ids = req.trailers.map((t, i) => 'DVIR_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 32) + '_' + (i + 1));
   return db.runTransaction(async tx => {
@@ -399,6 +440,7 @@ async function saveDvir(db, input, who, dates, stamp) {
     const runSnap = await tx.get(db.collection(C.runs).doc(req.runDocId)), run = runSnap.exists ? runSnap.data() : null, d = run && run.days && run.days[req.day];
     const date = run ? L.addDays(run.weekStart, L.DAYS.indexOf(req.day)) : '';
     if (!d || !d.runs || !who.mine(run, req.runDocId, req.day, d) || dates.indexOf(date) < 0) throw new SaveError('NOT_ALLOWED', 'This route is not assigned to you for that day; ask Dispatch');
+    if (!dvirOpen(date, today, leavesWall(run, req.day, date), now)) throw new SaveError('NOT_ALLOWED', 'This route does not leave until more than ' + DVIR_AHEAD_HOURS + ' hours from now. Do the pre-trip closer to when it leaves.');
     const equipment = (await tx.get(db.collection(C.equipment))).docs.map(x => x.data());
     // The write-ups: the tractor's with the first trailer, each trailer's with its own record (numbered when there are several).
     const records = [];
@@ -434,4 +476,4 @@ async function saveDvir(db, input, who, dates, stamp) {
   });
 }
 
-module.exports = { phoneCall, scheduleWeek, scheduleDays, employeeKey, newRouteCode, hashCode, MAX_FAILED_PER_MINUTE, DVIR, dvirTrailer };
+module.exports = { phoneCall, dvirPick, dvirOpen, leaveText, DVIR_AHEAD_HOURS, scheduleWeek, scheduleDays, employeeKey, newRouteCode, hashCode, MAX_FAILED_PER_MINUTE, DVIR, dvirTrailer };

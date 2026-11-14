@@ -144,3 +144,31 @@ test('the DVIR odometer starts at the truck\'s GPS odometer when Fleet has a rec
   load = (await phoneCall(db(), { code, op: 'loads', driverId: 'drv_test_brook' }, at())).loads[0];
   assert.equal(load.gpsOdometer, undefined, 'a reading 3 days old is not offered');
 });
+
+// Joe 11-14-26 ("route 12 on Tuesday ... leaves at 1:30 in the morning, it's not putting those values in there ... it hasn't
+// kicked over to the new day, which is 6 a.m."): the DVIR goes by when the run leaves. Brook's 801 also runs Wednesday 10/7
+// at 1:30 AM; at 1:00 AM Wednesday (still Tuesday's operating day) the pre-trip is on Wednesday's run and saves there.
+test('DVIR: a run leaving at 1:30 AM is offered before the 6 AM day change, and its inspection is saved on that run', async () => {
+  const { code } = await newRouteCode(db(), MANAGER);
+  const snap = (await db().collection('runs').where('weekStart', '==', WEEK).get()).docs.find(d => d.data().route === '801' && d.data().days.tue && d.data().days.tue.runs);
+  const tue = snap.data().days.tue;
+  assert.equal(tue.driverId, 'drv_test_brook');
+  await snap.ref.update({ 'days.wed': Object.assign({}, tue, { dispatchTime: 90 }), 'days.thu': Object.assign({}, tue, { dispatchTime: 16 * 60 }) });
+  const oneAm = (min) => () => new Date(Date.parse('2026-10-07T05:00:00Z') + (min || 0) * 60000);
+  const r = await phoneCall(db(), { code, op: 'loads', driverId: 'drv_test_brook', dvir: true }, oneAm());
+  // Tuesday's 4:00 AM run (left 21 hours ago) and Wednesday's 1:30 AM run; Thursday's run is not offered yet.
+  assert.deepEqual(r.loads.map(l => [l.day, l.date, l.leaves]), [['tue', '2026-10-06', 'Tue 4:00 AM'], ['wed', '2026-10-07', 'Wed 1:30 AM']]);
+  assert.deepEqual(r.pick, { pre: 1, post: 0 });
+  // The Check-In list is unchanged: today's (Tuesday's) loads.
+  assert.deepEqual((await phoneCall(db(), { code, op: 'loads', driverId: 'drv_test_brook' }, oneAm())).loads.map(l => l.day), ['tue']);
+  const ok = 'Checked — no defect';
+  const fields = { inspection: 'Pre-trip', odometer: '123456', truck: '900002', trailer: 'T-902', signatureName: 'Sam Brook', signature: 'TYPED', checks: Array(12).fill(ok) };
+  const load = r.loads[r.pick.pre];
+  const saved = await phoneCall(db(), { code, op: 'dvir', driverId: 'drv_test_brook', runDocId: load.runDocId, day: load.day, requestId: rid(), fields }, oneAm(1));
+  const dvir = (await db().collection('dvirs').doc(saved.recordId).get()).data();
+  assert.equal(dvir.day, 'wed');
+  assert.equal(dvir.date, '2026-10-07');
+  assert.equal(dvir.payload.inspection, 'Pre-trip');
+  // Thursday's run is refused: it is not yesterday's, today's or leaving within 12 hours.
+  await assert.rejects(phoneCall(db(), { code, op: 'dvir', driverId: 'drv_test_brook', runDocId: load.runDocId, day: 'thu', requestId: rid(), fields }, oneAm(2)), /not assigned to you for that day/);
+});
