@@ -11,6 +11,7 @@
 
 const crypto = require('crypto');
 const L = require('./logic');
+const T = require('./timing-rules');
 const M = require('./model');
 const FAILS = require('./fails');
 const A = require('./actions');
@@ -189,12 +190,26 @@ function scheduleWeek(today) { const week = L.weekStart(today); return L.dayPref
 // text, so a long number is never rounded.
 const employeeKey = (v) => { const t = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, ' '); return /^\d+$/.test(t) ? t.replace(/^0+(?=\d)/, '') : t; };
 const titleWord = (t) => String(t || '').toLowerCase().replace(/(^|[\s/-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+// Joe 11-14-26 ("Says off Sunday, it leaves 1 p.m. ... it's the day before ... it should say an abbreviation, leaves Sunday 1
+// p.m."): a run that leaves on another day than the day it delivers (a Monday Jersey that leaves Sunday 1:00 PM) names that day,
+// "Sun 1:00 PM", by the one leaving rule (timing-rules.js departWall). A run that leaves on its own day reads just the time.
+const LEAVE_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function leavesText(r, d, date) {
+  if (d.dispatchTime === null || d.dispatchTime === undefined || d.dispatchTime === '' || !isFinite(Number(d.dispatchTime))) return '';
+  const time = L.timeText(Number(d.dispatchTime));
+  // A run copied before the runs carried the route's Departure Day is not guessed at: just the time, as before.
+  if (!T.leavesOnOf(r.leavesOn)) return time;
+  const wall = T.departWall({ departureDate: d.departureDate, deliveryDate: date, loadDate: L.addDays(date, T.loadDayOffset(d.loadDayOffset)), leavesOn: r.leavesOn, dispatchTime: Number(d.dispatchTime) });
+  if (wall === null) return time;
+  const leaveDay = Math.floor(wall / T.DAY);
+  return leaveDay === T.dayNum(date) ? time : LEAVE_DAY[((leaveDay + 4) % 7 + 7) % 7] + ' ' + time;
+}
 function scheduleDays(driver, rows, exceptions, week, backups) {
   const board = L.driverBoardRows([driver], rows, exceptions, week, backups)[0];
   return L.DAYS.map((p, i) => {
     const date = L.addDays(week, i), c = board ? board.days[p] : null;
     const runs = rows.filter(r => r.days[p].runs && r.days[p].driverId === driver.id).map(r => {
-      const d = r.days[p], leaves = d.dispatchTime === null || d.dispatchTime === undefined || d.dispatchTime === '' ? '' : L.timeText(Number(d.dispatchTime));
+      const d = r.days[p], leaves = leavesText(r, d, date);
       return { route: L.routeNumber(r.streamId || r.route || ''), run: r.streamId ? '' : String(r.run || '').trim(), truck: d.truck || '', trailer: d.trailer || '', leaves };
     });
     // Off on a day with a run (the exception wins on the board too): the run still shows, marked off.

@@ -606,11 +606,13 @@
           driverId: d.driverId || '', driver: d.driver || '', truckId: d.truckId || '', truck: d.truck || '',
           trailerId: d.trailerId || '', trailer: d.trailer || '', dispatchTime: d.dispatchTime, routeHours: d.routeHours,
           intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || '', routeOverride: yes(d.routeOverride),
-          plantLoadOff: d.plantLoadOff === true
+          plantLoadOff: d.plantLoadOff === true,
+          // Joe 11-14-26: when the run leaves (a Jersey for Monday leaves Sunday 1:00 PM), for the schedule text and My Schedule.
+          loadDayOffset: d.loadDayOffset, departureDate: d.departureDate || ''
         };
       });
       return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, movementType: run.movementType || '', weekOrder: run.weekOrder, days: days, rev: run.rev || 0,
-        extraRun: run.extraRun === true, extraOf: run.extraOf || '' };
+        extraRun: run.extraRun === true, extraOf: run.extraOf || '', leavesOn: (run.masterShow && run.masterShow.leavesOn) || '' };
     }).sort(function (a, b) {
       var x = a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder;
       var y = b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder;

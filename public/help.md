@@ -2009,7 +2009,7 @@ Brings a new plant's data (routes, drivers, the plant, people and email) in from
 id: schedule-texts
 screens: texts.html, administration.html?item=schedule-texts
 
-Texts to drivers from the company's Twilio number. **Schedule texts** text each driver their own posted week, read the way **My Schedule** shows it on the phone (a block a day with the route, truck, trailer, leaving time and any day note); they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
+Texts to drivers from the company's Twilio number. **Schedule texts** text each driver their own posted week, read the way **My Schedule** shows it on the phone (a block a day with the route, truck, trailer, leaving time and any day note; a run that leaves the day before it delivers names the day it leaves, for example Monday's Jersey reads **Leaves Sun 1:00 PM**); they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
@@ -2060,7 +2060,7 @@ What drivers use on their phone (and on the Driver Room tablet). The first time,
 
 - **Check-In** (after the route): truck, trailer and pallet jack, cases delivered and returned, over or short, refused or returned product, truck, trailer and pallet jack problems, whether the trailer needs cleaning, and notes. Then `Check In`.
 - **DVIR** (truck inspection): pick Pre-trip or Post-trip. Every item starts as no defect; tick only what is wrong and write it up. The odometer starts at the truck's GPS reading. `+ Add trailer inspection` for a second trailer. Sign, then `Submit` (or `Review inspection` first).
-- **My Schedule** shows the driver's routes for the week, Sunday to Saturday.
+- **My Schedule** shows the driver's routes for the week, Sunday to Saturday. A run that leaves the day before it delivers names that day, for example **Leaves Sun 1:00 PM** under Monday.
 - **Route Book** (on the Check-In list) shows the route book for the driver's loads that day: the stops in the order to run them, each with its load number, address (tap it for the map), keys or door code, phone and notes, then the route's instructions. It comes from the Hub's copy of the **Customer List** app's **Route Sequence** (active customers only), so a change there shows here by itself within a few minutes. A customer made Inactive is not on it.
 - **View Loadout** shows the route list and each load's status, updating by itself. Loads left over from yesterday that are not loaded yet are at the top under a light orange **Yesterday's loads** line; today's loads follow under a light blue **Today's loads** line. On Sunday it also shows Monday's loads that were loaded on Saturday, loaded or not, until 6 a.m. Monday.
 - With no signal, check-ins and DVIRs wait on the phone and go when the signal is back.
